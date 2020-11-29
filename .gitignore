@@ -1,0 +1,7 @@
+*.pyc
+.idea/
+.project
+.pydevproject
+.vscode/
+test/.pytest_cache/
+test/**/.pytest_cache/

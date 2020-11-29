@@ -1,0 +1,110 @@
+{
+    "count": 15, 
+    "nodeType": "nurbsCurve", 
+    "name": "cubeShape", 
+    "degree": 1, 
+    "color": 0, 
+    "positions": [
+        [
+            -1.0, 
+            -1.0, 
+            1.0
+        ], 
+        [
+            1.0, 
+            -1.0, 
+            1.0
+        ], 
+        [
+            1.0, 
+            -1.0, 
+            -1.0
+        ], 
+        [
+            -1.0, 
+            -1.0, 
+            -1.0
+        ], 
+        [
+            -1.0, 
+            -1.0, 
+            1.0
+        ], 
+        [
+            -1.0, 
+            1.0, 
+            1.0
+        ], 
+        [
+            -1.0, 
+            1.0, 
+            -1.0
+        ], 
+        [
+            -1.0, 
+            -1.0, 
+            -1.0
+        ], 
+        [
+            -1.0, 
+            1.0, 
+            -1.0
+        ], 
+        [
+            1.0, 
+            1.0, 
+            -1.0
+        ], 
+        [
+            1.0, 
+            -1.0, 
+            -1.0
+        ], 
+        [
+            1.0, 
+            1.0, 
+            -1.0
+        ], 
+        [
+            1.0, 
+            1.0, 
+            1.0
+        ], 
+        [
+            1.0, 
+            -1.0, 
+            1.0
+        ], 
+        [
+            1.0, 
+            1.0, 
+            1.0
+        ]
+    ], 
+    "transform": "cube", 
+    "connections": [], 
+    "points": [
+        "cubeShape.cv[0]", 
+        "cubeShape.cv[1]", 
+        "cubeShape.cv[2]", 
+        "cubeShape.cv[3]", 
+        "cubeShape.cv[4]", 
+        "cubeShape.cv[5]", 
+        "cubeShape.cv[6]", 
+        "cubeShape.cv[7]", 
+        "cubeShape.cv[8]", 
+        "cubeShape.cv[9]", 
+        "cubeShape.cv[10]", 
+        "cubeShape.cv[11]", 
+        "cubeShape.cv[12]", 
+        "cubeShape.cv[13]", 
+        "cubeShape.cv[14]"
+    ], 
+    "form": "Open", 
+    "spans": 15, 
+    "attributeValues": {
+        "caching": false, 
+        "frozen": false, 
+        "nodeState": "Normal"
+    }
+}

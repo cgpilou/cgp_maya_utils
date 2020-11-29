@@ -1,0 +1,44 @@
+{
+    "count": 4, 
+    "nodeType": "nurbsCurve", 
+    "name": "squareShape", 
+    "degree": 1, 
+    "color": 0, 
+    "positions": [
+        [
+            -1.0, 
+            0.0, 
+            1.0
+        ], 
+        [
+            1.0, 
+            0.0, 
+            1.0
+        ], 
+        [
+            1.0, 
+            0.0, 
+            -1.0
+        ], 
+        [
+            -1.0, 
+            0.0, 
+            -1.0
+        ]
+    ], 
+    "transform": "square", 
+    "connections": [], 
+    "points": [
+        "squareShape.cv[0]", 
+        "squareShape.cv[1]", 
+        "squareShape.cv[2]", 
+        "squareShape.cv[3]"
+    ], 
+    "form": "Open", 
+    "spans": 4, 
+    "attributeValues": {
+        "caching": false, 
+        "frozen": false, 
+        "nodeState": "Normal"
+    }
+}

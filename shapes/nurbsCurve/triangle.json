@@ -1,0 +1,38 @@
+{
+    "count": 3, 
+    "nodeType": "nurbsCurve", 
+    "name": "triangleShape", 
+    "degree": 1, 
+    "color": 0, 
+    "positions": [
+        [
+            -1.0, 
+            0.0, 
+            1.0
+        ], 
+        [
+            1.0, 
+            0.0, 
+            1.0
+        ], 
+        [
+            0.0, 
+            0.0, 
+            -1.0
+        ]
+    ], 
+    "transform": "triangle", 
+    "connections": [], 
+    "points": [
+        "triangleShape.cv[0]", 
+        "triangleShape.cv[1]", 
+        "triangleShape.cv[2]"
+    ], 
+    "form": "Open", 
+    "spans": 3, 
+    "attributeValues": {
+        "caching": false, 
+        "frozen": false, 
+        "nodeState": "Normal"
+    }
+}
