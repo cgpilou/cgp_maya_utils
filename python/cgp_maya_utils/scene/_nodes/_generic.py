@@ -672,14 +672,20 @@ class Reference(Node):
         :type namespaceSubstitute: str
         """
 
-        # init
-        namespace = self.namespace()
+        # return
+        if not self.file():
+            self.delete()
+            return
 
         # import objects
-        maya.cmds.file(self.file(), importReference=True)
+        copyFile = maya.cmds.referenceQuery(self.name(), filename=True, withoutCopyNumber=False)
+        maya.cmds.file(copyFile, importReference=True)
 
         # clean namespace
         if namespaceSubstitute is not None:
+
+            # get namespace
+            namespace = self.namespace()
 
             # rename content
             for obj in maya.cmds.namespaceInfo(namespace, listNamespace=True, recurse=True):
