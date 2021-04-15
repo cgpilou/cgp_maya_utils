@@ -634,7 +634,7 @@ class Reference(Node):
         data = super(Reference, self).data()
 
         # update data
-        data['file'] = self.file()
+        data['file'] = self.file_()
         data['namespace'] = self.namespace().fullName(asAbsolute=False)
 
         # return
@@ -645,13 +645,13 @@ class Reference(Node):
         """
 
         # execute
-        if self.file():
-            maya.cmds.file(self.file(), removeReference=True)
+        if self.file_():
+            maya.cmds.file(self.file_(), removeReference=True)
         else:
             maya.cmds.lockNode(self.name(), lock=False)
             maya.cmds.delete(self.name())
 
-    def file(self):
+    def file_(self):
         """the file associated to the reference node
 
         :return: the file of the reference node
@@ -673,7 +673,7 @@ class Reference(Node):
         """
 
         # return
-        if not self.file():
+        if not self.file_():
             self.delete()
             return
 
@@ -703,10 +703,10 @@ class Reference(Node):
         """
 
         # get namespace
-        namespace = maya.cmds.file(self.file(), query=True, namespace=True)
+        namespace = maya.cmds.file(self.file_(), query=True, namespace=True)
 
         # return
-        return cgp_maya_utils.scene._api.namespace(namespace) if self.file() else None
+        return cgp_maya_utils.scene._api.namespace(namespace) if self.file_() else None
 
     def setNamespace(self, namespace, renameNode=True):
         """set the namespace
@@ -726,7 +726,7 @@ class Reference(Node):
             maya.cmds.warning('reference already has {0} namespace'.format(namespace))
             return
 
-        if not self.file():
+        if not self.file_():
             maya.cmds.warning("can't set namespace on reference that doesn't have a file path set")
             return
 
@@ -734,11 +734,11 @@ class Reference(Node):
             maya.cmds.warning('{0} is already existing'.format(namespace))
             return
 
-        # get infos
+        # check if the reference node is locked
         isLocked = self.isLocked()
 
         # set namespace
-        maya.cmds.file(self.file(), edit=True, namespace=namespace)
+        maya.cmds.file(self.file_(), edit=True, namespace=namespace)
 
         # rename node
         if renameNode:

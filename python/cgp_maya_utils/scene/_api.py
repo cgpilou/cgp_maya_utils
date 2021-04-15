@@ -128,25 +128,25 @@ def getAttributes(name, attributeTypes=None):
     :type attributeTypes: list[str]
 
     :return: the listed Attributes
-    :rtype: list[:class:`cgp_maya_utils.scene.Attribute`,
-                 :class:`cgp_maya_utils.scene.BoolAttribute`,
-                 :class:`cgp_maya_utils.scene.ByteAttribute`,
-                 :class:`cgp_maya_utils.scene.CompoundAttribute`,
-                 :class:`cgp_maya_utils.scene.Double3Attribute`,
-                 :class:`cgp_maya_utils.scene.DoubleAngleAttribute`,
-                 :class:`cgp_maya_utils.scene.DoubleAttribute`,
-                 :class:`cgp_maya_utils.scene.DoubleLinearAttribute`,
-                 :class:`cgp_maya_utils.scene.EnumAttribute`,
-                 :class:`cgp_maya_utils.scene.Float3Attribute`,
-                 :class:`cgp_maya_utils.scene.FloatAttribute`,
-                 :class:`cgp_maya_utils.scene.LongAttribute`,
-                 :class:`cgp_maya_utils.scene.MatrixAttribute`,
-                 :class:`cgp_maya_utils.scene.MessageAttribute`,
-                 :class:`cgp_maya_utils.scene.NumericAttribute`,
-                 :class:`cgp_maya_utils.scene.ShortAttribute`,
-                 :class:`cgp_maya_utils.scene.StringAttribute`,
-                 :class:`cgp_maya_utils.scene.TDataCompoundAttribute`,
-                 :class:`cgp_maya_utils.scene.TimeAttribute`]
+    :rtype: tuple[:class:`cgp_maya_utils.scene.Attribute`,
+                  :class:`cgp_maya_utils.scene.BoolAttribute`,
+                  :class:`cgp_maya_utils.scene.ByteAttribute`,
+                  :class:`cgp_maya_utils.scene.CompoundAttribute`,
+                  :class:`cgp_maya_utils.scene.Double3Attribute`,
+                  :class:`cgp_maya_utils.scene.DoubleAngleAttribute`,
+                  :class:`cgp_maya_utils.scene.DoubleAttribute`,
+                  :class:`cgp_maya_utils.scene.DoubleLinearAttribute`,
+                  :class:`cgp_maya_utils.scene.EnumAttribute`,
+                  :class:`cgp_maya_utils.scene.Float3Attribute`,
+                  :class:`cgp_maya_utils.scene.FloatAttribute`,
+                  :class:`cgp_maya_utils.scene.LongAttribute`,
+                  :class:`cgp_maya_utils.scene.MatrixAttribute`,
+                  :class:`cgp_maya_utils.scene.MessageAttribute`,
+                  :class:`cgp_maya_utils.scene.NumericAttribute`,
+                  :class:`cgp_maya_utils.scene.ShortAttribute`,
+                  :class:`cgp_maya_utils.scene.StringAttribute`,
+                  :class:`cgp_maya_utils.scene.TDataCompoundAttribute`,
+                  :class:`cgp_maya_utils.scene.TimeAttribute`]
     """
 
     # init
@@ -167,7 +167,7 @@ def getAttributes(name, attributeTypes=None):
             attributes.extend(listedAttributes)
 
     # return
-    return attributes
+    return tuple([attribute(attribute_) for attribute_ in attributes])
 
 
 def getNodesFromAttributes(attributes):
@@ -177,30 +177,30 @@ def getNodesFromAttributes(attributes):
     :type attributes: list[str]
 
     :return: the gathered nodes
-    :rtype: list[:class:`cgp_maya_utils.scene.Node`,
-                 :class:`cgp_maya_utils.scene.AimConstraint`,
-                 :class:`cgp_maya_utils.scene.AnimCurve`,
-                 :class:`cgp_maya_utils.scene.AnimCurveTA`,
-                 :class:`cgp_maya_utils.scene.AnimCurveTL`,
-                 :class:`cgp_maya_utils.scene.AnimCurveTU`,
-                 :class:`cgp_maya_utils.scene.Constraint`,
-                 :class:`cgp_maya_utils.scene.DagNode`,
-                 :class:`cgp_maya_utils.scene.GeometryFilter`,
-                 :class:`cgp_maya_utils.scene.IkEffector`,
-                 :class:`cgp_maya_utils.scene.IkHandle`,
-                 :class:`cgp_maya_utils.scene.Joint`,
-                 :class:`cgp_maya_utils.scene.Mesh`,
-                 :class:`cgp_maya_utils.scene.Node`,
-                 :class:`cgp_maya_utils.scene.NurbsCurve`,
-                 :class:`cgp_maya_utils.scene.NurbsSurface`,
-                 :class:`cgp_maya_utils.scene.OrientConstraint`,
-                 :class:`cgp_maya_utils.scene.ParentConstraint`,
-                 :class:`cgp_maya_utils.scene.PointConstraint`,
-                 :class:`cgp_maya_utils.scene.Reference`,
-                 :class:`cgp_maya_utils.scene.ScaleConstraint`,
-                 :class:`cgp_maya_utils.scene.Shape`,
-                 :class:`cgp_maya_utils.scene.SkinCluster`,
-                 :class:`cgp_maya_utils.scene.Transform`]
+    :rtype: tuple[:class:`cgp_maya_utils.scene.Node`,
+                  :class:`cgp_maya_utils.scene.AimConstraint`,
+                  :class:`cgp_maya_utils.scene.AnimCurve`,
+                  :class:`cgp_maya_utils.scene.AnimCurveTA`,
+                  :class:`cgp_maya_utils.scene.AnimCurveTL`,
+                  :class:`cgp_maya_utils.scene.AnimCurveTU`,
+                  :class:`cgp_maya_utils.scene.Constraint`,
+                  :class:`cgp_maya_utils.scene.DagNode`,
+                  :class:`cgp_maya_utils.scene.GeometryFilter`,
+                  :class:`cgp_maya_utils.scene.IkEffector`,
+                  :class:`cgp_maya_utils.scene.IkHandle`,
+                  :class:`cgp_maya_utils.scene.Joint`,
+                  :class:`cgp_maya_utils.scene.Mesh`,
+                  :class:`cgp_maya_utils.scene.Node`,
+                  :class:`cgp_maya_utils.scene.NurbsCurve`,
+                  :class:`cgp_maya_utils.scene.NurbsSurface`,
+                  :class:`cgp_maya_utils.scene.OrientConstraint`,
+                  :class:`cgp_maya_utils.scene.ParentConstraint`,
+                  :class:`cgp_maya_utils.scene.PointConstraint`,
+                  :class:`cgp_maya_utils.scene.Reference`,
+                  :class:`cgp_maya_utils.scene.ScaleConstraint`,
+                  :class:`cgp_maya_utils.scene.Shape`,
+                  :class:`cgp_maya_utils.scene.SkinCluster`,
+                  :class:`cgp_maya_utils.scene.Transform`]
     """
 
     # init
@@ -226,7 +226,7 @@ def getNodesFromAttributes(attributes):
             data.append(node(node_))
 
     # return
-    return data
+    return tuple(data)
 
 
 # COMPONENT COMMANDS #
@@ -389,30 +389,30 @@ def getNodes(namePattern=None, nodeTypes=None, asExactNodeTypes=False):
     :type asExactNodeTypes: bool
 
     :return: the listed Nodes
-    :rtype: list[:class:`cgp_maya_utils.scene.Node`,
-                 :class:`cgp_maya_utils.scene.AimConstraint`,
-                 :class:`cgp_maya_utils.scene.AnimCurve`,
-                 :class:`cgp_maya_utils.scene.AnimCurveTA`,
-                 :class:`cgp_maya_utils.scene.AnimCurveTL`,
-                 :class:`cgp_maya_utils.scene.AnimCurveTU`,
-                 :class:`cgp_maya_utils.scene.Constraint`,
-                 :class:`cgp_maya_utils.scene.DagNode`,
-                 :class:`cgp_maya_utils.scene.GeometryFilter`,
-                 :class:`cgp_maya_utils.scene.IkEffector`,
-                 :class:`cgp_maya_utils.scene.IkHandle`,
-                 :class:`cgp_maya_utils.scene.Joint`,
-                 :class:`cgp_maya_utils.scene.Mesh`,
-                 :class:`cgp_maya_utils.scene.Node`,
-                 :class:`cgp_maya_utils.scene.NurbsCurve`,
-                 :class:`cgp_maya_utils.scene.NurbsSurface`,
-                 :class:`cgp_maya_utils.scene.OrientConstraint`,
-                 :class:`cgp_maya_utils.scene.ParentConstraint`,
-                 :class:`cgp_maya_utils.scene.PointConstraint`,
-                 :class:`cgp_maya_utils.scene.Reference`,
-                 :class:`cgp_maya_utils.scene.ScaleConstraint`,
-                 :class:`cgp_maya_utils.scene.Shape`,
-                 :class:`cgp_maya_utils.scene.SkinCluster`,
-                 :class:`cgp_maya_utils.scene.Transform`]
+    :rtype: tuple[:class:`cgp_maya_utils.scene.Node`,
+                  :class:`cgp_maya_utils.scene.AimConstraint`,
+                  :class:`cgp_maya_utils.scene.AnimCurve`,
+                  :class:`cgp_maya_utils.scene.AnimCurveTA`,
+                  :class:`cgp_maya_utils.scene.AnimCurveTL`,
+                  :class:`cgp_maya_utils.scene.AnimCurveTU`,
+                  :class:`cgp_maya_utils.scene.Constraint`,
+                  :class:`cgp_maya_utils.scene.DagNode`,
+                  :class:`cgp_maya_utils.scene.GeometryFilter`,
+                  :class:`cgp_maya_utils.scene.IkEffector`,
+                  :class:`cgp_maya_utils.scene.IkHandle`,
+                  :class:`cgp_maya_utils.scene.Joint`,
+                  :class:`cgp_maya_utils.scene.Mesh`,
+                  :class:`cgp_maya_utils.scene.Node`,
+                  :class:`cgp_maya_utils.scene.NurbsCurve`,
+                  :class:`cgp_maya_utils.scene.NurbsSurface`,
+                  :class:`cgp_maya_utils.scene.OrientConstraint`,
+                  :class:`cgp_maya_utils.scene.ParentConstraint`,
+                  :class:`cgp_maya_utils.scene.PointConstraint`,
+                  :class:`cgp_maya_utils.scene.Reference`,
+                  :class:`cgp_maya_utils.scene.ScaleConstraint`,
+                  :class:`cgp_maya_utils.scene.Shape`,
+                  :class:`cgp_maya_utils.scene.SkinCluster`,
+                  :class:`cgp_maya_utils.scene.Transform`]
     """
 
     # init
@@ -440,7 +440,7 @@ def getNodes(namePattern=None, nodeTypes=None, asExactNodeTypes=False):
             nodes.extend(listedNodes)
 
     # return
-    return nodes
+    return tuple([node(node_) for node_ in nodes])
 
 
 def node(name):
