@@ -677,15 +677,15 @@ class Reference(Node):
             self.delete()
             return
 
+        # get namespace
+        namespace = self.namespace()
+
         # import objects
         copyFile = maya.cmds.referenceQuery(self.name(), filename=True, withoutCopyNumber=False)
         maya.cmds.file(copyFile, importReference=True)
 
         # clean namespace
         if namespaceSubstitute is not None:
-
-            # get namespace
-            namespace = self.namespace()
 
             # rename content
             for obj in maya.cmds.namespaceInfo(namespace, listNamespace=True, recurse=True):
@@ -703,7 +703,8 @@ class Reference(Node):
         """
 
         # get namespace
-        namespace = maya.cmds.file(self.file_(), query=True, namespace=True)
+        copyFile = maya.cmds.referenceQuery(self.name(), filename=True, withoutCopyNumber=False)
+        namespace = maya.cmds.file(copyFile, query=True, namespace=True)
 
         # return
         return cgp_maya_utils.scene._api.namespace(namespace) if self.file_() else None
