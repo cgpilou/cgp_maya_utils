@@ -454,4 +454,4 @@ class Scene(object):
         """
 
         # execute
-        maya.cmds.file(self.file().path(), open=True, force=force)
+        maya.cmds.file(self.file_().path(), open=True, force=force)
