@@ -107,15 +107,16 @@ class Node(object):
         """
 
         # create node
-        node = cls(maya.cmds.createNode(nodeType, name=name or nodeType))
+        node = maya.cmds.createNode(nodeType, name=name or nodeType)
+        nodeObject = cgp_maya_utils.scene._api.node(node)
 
         # set attributeValues
         if attributeValues:
-            node.setAttributeValues(attributeValues)
+            nodeObject.setAttributeValues(attributeValues)
 
         # set connections
         if connections:
-            node.setConnections(connections)
+            nodeObject.setConnections(connections)
 
         # return
         return node

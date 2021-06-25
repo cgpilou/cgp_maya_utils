@@ -22,12 +22,53 @@ class GeometryFilter(_generic.Node):
 
     _nodeType = 'geometryFilter'
 
+    # OBJECT COMMANDS #
+
+    @classmethod
+    def create(cls, geometry, connections=None, attributeValues=None, name=None, **kwargs):
+        """create a geometry filter
+
+        :param geometry: geometry to bind the created geometry filter to
+        :type geometry: str
+
+        :param connections: connections to set on the created geometry filter
+        :type connections: list[tuple[str]]
+
+        :param attributeValues: attribute values to set on the created geometry filter
+        :type attributeValues: dict
+
+        :param name: name of the created geometry filter
+        :type name: str
+
+        :return: the created geometry filter object
+        :rtype: :class:`cgp_maya_utils.scene.GeometryFilter`
+        """
+
+        # errors
+        if cls._nodeType == 'geometryFilter':
+            raise RuntimeError('GeometryFilter.create is not callable for untyped geometry filters')
+
+        # create node
+        deformerNode = maya.cmds.deformer(geometry, type=cls._nodeType, name=name or cls._nodeType)[0]
+        deformerObject = cls(deformerNode)
+
+        # set attributeValues
+        if attributeValues:
+            deformerObject.setAttributeValues(attributeValues)
+
+        # set connections
+        if connections:
+            deformerObject.setConnections(connections)
+
+        # return
+        return deformerObject
+
     # COMMANDS #
 
-    def addShape(self, shape):
-        """add a shape to deform to the geometry filter node
+    def bind(self, shape):
+        """bind the geometry filter to the specified shape
 
-        :param shape: shape that will be deformed by the geometry filter node - can be the shape or its transform
+        :param shape: shape the geometry filter node will be bound to - can be the shape or its transform
         :type shape: str or :class:`cgp_maya_utils.scene.Shape` or :class:`cgp_maya_utils.scene.Transform`
         """
 
@@ -70,16 +111,6 @@ class GeometryFilter(_generic.Node):
 
         # execute
         raise NotImplementedError('{0}.reset() needs to be implemented'.format(self.__class__.__name__))
-
-    def setData(self, data):
-        """set the data on the geometry filter node
-
-        :param data: data to set on the geometry filter node
-        :type data: dict
-        """
-
-        # execute
-        raise NotImplementedError('{0}.setData() needs to be implemented'.format(self.__class__.__name__))
 
     def shapes(self):
         """the shapes deformed by the geometry filter node
@@ -206,7 +237,7 @@ class SkinCluster(GeometryFilter):
 
         # transfer skin from buildObj to obj if necessary
         if not buildObj == obj:
-            skinCluster.addShape(obj)
+            skinCluster.bind(obj)
             buildObj.delete()
 
         # set weights
@@ -224,7 +255,7 @@ class SkinCluster(GeometryFilter):
         # add other shapes
         if len(shapes) > 1:
             for shape in shapes[1:]:
-                skinCluster.addShape(shape)
+                skinCluster.bind(shape)
 
         # return
         return skinCluster
