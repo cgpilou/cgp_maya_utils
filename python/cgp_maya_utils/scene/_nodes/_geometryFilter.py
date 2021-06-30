@@ -528,7 +528,7 @@ class SkinCluster(GeometryFilter):
         for connection in connections:
 
             # get new influence
-            newInfluenceAttr = connection.source().name().replace(oldFlag, newFlag)
+            newInfluenceAttr = connection.source().fullName().replace(oldFlag, newFlag)
 
             # errors
             if not maya.cmds.objExists(newInfluenceAttr):
