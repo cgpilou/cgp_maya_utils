@@ -370,7 +370,7 @@ class Node(object):
         """
 
         # get namespace
-        namespace = self.name().rpartition('|')[-1].rpartition(':')[0]
+        namespace = self.name().rpartition('|')[-1].rpartition(':')[0] or ':'
 
         # return
         return cgp_maya_utils.scene._api.namespace(namespace)
