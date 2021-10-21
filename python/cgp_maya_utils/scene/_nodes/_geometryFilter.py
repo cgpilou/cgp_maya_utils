@@ -484,7 +484,7 @@ class SkinCluster(GeometryFilter):
 
         # flood to 1 on first joint
         maya.cmds.skinPercent(self.name(), self.shapes()[0], transformValue=(str(influences[0]), 1))
-        pttAttribute.connect('{0}.message'.format(influences[0]))
+        pttAttribute.connect(source='{0}.message'.format(influences[0]))
 
         # apply influences
         for influence in influences[1:]:
@@ -497,7 +497,7 @@ class SkinCluster(GeometryFilter):
             else:
 
                 # connect joint to paint attribute
-                pttAttribute.connect('{0}.message'.format(influence))
+                pttAttribute.connect(source='{0}.message'.format(influence))
 
                 # set paint attribute and lock joint
                 ptwAttribute.setValue(weights[influence.name()])
