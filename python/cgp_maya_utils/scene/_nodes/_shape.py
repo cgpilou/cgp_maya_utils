@@ -416,24 +416,15 @@ class Shape(_generic.DagNode):
 
         # absolute
         else:
-            # create temp locator
-            tempLoc = _transform.Transform(maya.cmds.spaceLocator()[0])
 
-            # snap locator to position
-            tempLoc.match(self.transform())
+            # get shape positions
+            positions = self.positions(worldSpace=True)
 
-            # parent shape to locator
-            maya.cmds.parent(self.name(), tempLoc.name(), shape=True, relative=True)
-
-            # parent locator to target - freeze transform
-            tempLoc.setParent(transform)
-            tempLoc.freeze()
-
-            # parent shape to target
+            # parent shape
             maya.cmds.parent(self.name(), transform, shape=True, relative=True)
 
-            # delete temp locator
-            tempLoc.delete()
+            # set worldspace positions
+            self.setPositions(positions, worldSpace=True)
 
         # delete original transform if specified
         if deleteOriginalTransform:
