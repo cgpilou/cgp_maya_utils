@@ -271,22 +271,6 @@ class Scene(object):
 
     # INIT #
 
-    def __getattr__(self, attribute):
-        """override getattr
-
-        :param attribute: the attribute to get
-        :type attribute: str
-
-        :return: the attr value
-        :rtype: N/C
-        """
-
-        # get the fileObject
-        fileObject = cgp_generic_utils.files.entity(self.file_().path())
-
-        # return
-        return getattr(fileObject, attribute)
-
     def __repr__(self):
         """the representation of the scene object
 
