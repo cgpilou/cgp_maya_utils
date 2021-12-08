@@ -5,6 +5,7 @@ miscellaneous object library
 # imports third-parties
 import maya.cmds
 import maya.mel
+import PySide2.QtWidgets
 import cgp_generic_utils.files
 import cgp_generic_utils.constants
 
@@ -330,6 +331,22 @@ class Scene(object):
 
         # return
         return maya.cmds.currentTime(query=True)
+
+    @staticmethod
+    def mainWindow():
+        """get the maya main window
+
+        :return: the main window
+        :rtype: :class:`PySide2.QtWidgets.QMainWindow`
+        """
+
+        # get maya application
+        mayaApplication = PySide2.QtWidgets.QApplication.instance()
+
+        # return
+        for widget in mayaApplication.topLevelWidgets():
+            if widget.objectName() == 'MayaWindow':
+                return widget
 
     @staticmethod
     def maximumTime():
