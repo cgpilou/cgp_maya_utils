@@ -109,42 +109,6 @@ class Shape(_generic.DagNode):
         # return
         return data
 
-    def deformers(self, deformerTypes=None, deformerTypeIncluded=True):
-        """get the deformers bounded to shape
-
-        :param deformerTypes:  types of deformers to get - All if nothing is specified
-        :type deformerTypes: list[str]
-
-        :param deformerTypeIncluded: defines whether the types will be included in the get or excluded
-        :type deformerTypeIncluded: bool
-
-        :return: list of deformers connected to the object
-        :rtype: list[:class:`rdo_maya_rig_utils.scene.GeometryFilter`]
-        """
-
-        # init
-        validDeformers = []
-
-        # get all deformers
-        allDeformers = maya.cmds.findDeformers(self.name())
-
-        # get deformerTypes to query
-        if not deformerTypes and deformerTypeIncluded:
-            validDeformers = allDeformers
-
-        elif deformerTypes and deformerTypeIncluded:
-            validDeformers = [deformer
-                              for deformer in allDeformers
-                              if maya.cmds.nodeType(deformer) in deformerTypes]
-
-        elif deformerTypes and not deformerTypeIncluded:
-            validDeformers = [deformer
-                              for deformer in allDeformers
-                              if maya.cmds.nodeType(deformer) not in deformerTypes]
-
-        # return
-        return [cgp_maya_utils.scene._api.node(deformer) for deformer in validDeformers]
-
     def duplicate(self, newTransform=False):
         """duplicate the shape
 
@@ -209,40 +173,27 @@ class Shape(_generic.DagNode):
         """
 
         # init
-        geometryFilters = []
-        queryGeometryFilterTypes = []
+        validDeformers = []
 
-        # errors
-        if geometryFilterTypes:
-            for typ in geometryFilterTypes:
-                if typ not in cgp_maya_utils.constants.NodeType.GEOMETRY_FILTERS:
-                    raise ValueError('{0} is not a valid type - {1}'
-                                     .format(typ, cgp_maya_utils.constants.NodeType.GEOMETRY_FILTERS))
+        # get all deformers
+        allDeformers = maya.cmds.findDeformers(self.name())
 
-        # get geometryFilterTypes to query
+        # get deformerTypes to query
         if not geometryFilterTypes and geometryFilterTypesIncluded:
-            queryGeometryFilterTypes = cgp_maya_utils.constants.NodeType.GEOMETRY_FILTERS
+            validDeformers = allDeformers
 
         elif geometryFilterTypes and geometryFilterTypesIncluded:
-            queryGeometryFilterTypes = geometryFilterTypes
+            validDeformers = [deformer
+                              for deformer in allDeformers
+                              if maya.cmds.nodeType(deformer) in geometryFilterTypes]
 
         elif geometryFilterTypes and not geometryFilterTypesIncluded:
-            queryGeometryFilterTypes = (set(cgp_maya_utils.constants.NodeType.GEOMETRY_FILTERS)
-                                        - set(geometryFilterTypes))
-
-        # get history
-        history = maya.cmds.ls(maya.cmds.listHistory(self.name(), pruneDagObjects=True),
-                               type='geometryFilter',
-                               recursive=True)
-
-        # execute
-        if history is not None:
-            for item in history:
-                if maya.cmds.nodeType(item) in queryGeometryFilterTypes:
-                    geometryFilters.append(cgp_maya_utils.scene._api.node(item))
+            validDeformers = [deformer
+                              for deformer in allDeformers
+                              if maya.cmds.nodeType(deformer) not in geometryFilterTypes]
 
         # return
-        return geometryFilters
+        return [cgp_maya_utils.scene._api.node(deformer) for deformer in validDeformers]
 
     def isDeformed(self):
         """check if the shape is deformed
