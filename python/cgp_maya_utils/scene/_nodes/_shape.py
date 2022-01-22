@@ -109,6 +109,42 @@ class Shape(_generic.DagNode):
         # return
         return data
 
+    def deformers(self, deformerTypes=None, deformerTypeIncluded=True):
+        """get the deformers bounded to shape
+
+        :param deformerTypes:  types of deformers to get - All if nothing is specified
+        :type deformerTypes: list[str]
+
+        :param deformerTypeIncluded: defines whether the types will be included in the get or excluded
+        :type deformerTypeIncluded: bool
+
+        :return: list of deformers connected to the object
+        :rtype: list[:class:`rdo_maya_rig_utils.scene.GeometryFilter`]
+        """
+
+        # init
+        validDeformers = []
+
+        # get all deformers
+        allDeformers = maya.cmds.findDeformers(self.name())
+
+        # get deformerTypes to query
+        if not deformerTypes and deformerTypeIncluded:
+            validDeformers = allDeformers
+
+        elif deformerTypes and deformerTypeIncluded:
+            validDeformers = [deformer
+                              for deformer in allDeformers
+                              if maya.cmds.nodeType(deformer) in deformerTypes]
+
+        elif deformerTypes and not deformerTypeIncluded:
+            validDeformers = [deformer
+                              for deformer in allDeformers
+                              if maya.cmds.nodeType(deformer) not in deformerTypes]
+
+        # return
+        return [cgp_maya_utils.scene._api.node(deformer) for deformer in validDeformers]
+
     def duplicate(self, newTransform=False):
         """duplicate the shape
 
