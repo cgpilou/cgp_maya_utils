@@ -428,7 +428,7 @@ class Shape(_generic.DagNode):
         xform = maya.cmds.listRelatives(self.name(), parent=True, fullPath=True)[0]
 
         # return
-        return _transform.Transform(xform)
+        return cgp_maya_utils.scene._api.node(xform)
 
     def translate(self, values, worldSpace=False):
         """translate the shape
