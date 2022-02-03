@@ -185,15 +185,19 @@ class UndoChunk(cgp_generic_utils.decorators.Decorator):
     """decorator that encapsulate the script into its own undo chunk
     """
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, isUndoing=True):
         """UndoChunk class initialization
 
         :param name: name of the undoChunk
+        :type name: str
+
+        :param name: ``True`` : Actions are undone if error occurred - ``False`` : Actions are not undone
         :type name: str
         """
 
         # init
         self._name = name
+        self._isUndoing = isUndoing
 
     def __enter__(self):
         """enter UndoChunk decorator
@@ -202,9 +206,13 @@ class UndoChunk(cgp_generic_utils.decorators.Decorator):
         # execute
         maya.cmds.undoInfo(openChunk=True, chunkName=self._name)
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(self, exceptionType, *args, **kwargs):
         """exit UndoChunk decorator
         """
 
-        # execute
+        # close chunk
         maya.cmds.undoInfo(closeChunk=True)
+
+        # undo
+        if exceptionType is not None and self._isUndoing:
+            maya.cmds.undo()
