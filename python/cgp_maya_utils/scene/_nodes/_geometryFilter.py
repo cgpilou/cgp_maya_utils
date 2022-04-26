@@ -4,6 +4,7 @@ geometryFilter object library
 
 # imports third-parties
 import maya.cmds
+import maya.api.OpenMaya
 
 # imports local
 import cgp_maya_utils.constants
@@ -22,7 +23,7 @@ class GeometryFilter(_generic.Node):
 
     _nodeType = 'geometryFilter'
 
-    # OBJECT COMMANDS #
+    # STATIC COMMANDS #
 
     @classmethod
     def create(cls, geometry, connections=None, attributeValues=None, name=None, **kwargs):
@@ -155,6 +156,97 @@ class GeometryFilter(_generic.Node):
 
 
 # GEOMETRY FILTER OBJECTS #
+
+
+class BlendShape(GeometryFilter):
+
+    # ATTRIBUTES #
+
+    _nodeType = 'blendShape'
+
+    # PROPERTIES #
+
+    @property
+    def _availableAttributes(self):
+        """get the setting attributes
+
+        :return: the setting attributes
+        :rtype: dict
+        """
+
+        # init
+        settingAttributes = super(GeometryFilter, self)._availableAttributes
+
+        # update settingAttributes
+        settingAttributes.extend(['supportNegativeWeights'])
+
+        # return
+        return settingAttributes
+
+    # OBJECT COMMANDS #
+
+    def setTarget(self, name, positions, indexes):
+        """set a target to the blendShape - if target name is already exists, target will be updated. Otherwise,
+        a new target will be created at the bottom of the target list
+
+        :param name: name of the target to set
+        :type name: str
+
+        :param positions: positions of the vertices of the target - [[x1, y1, z1], [x2, y2, z2], ...]
+        :type positions: list[list[float]] or array[array[float]]
+
+        :param indexes: indexes of the vertices of the target - [index1, index2 ...]
+        :type indexes: list[int] or array[int]
+        """
+
+        # errors
+        if not len(positions) == len(indexes):
+            raise ValueError('positions and indexes lists don\'t have the same dimension - '
+                             'positions : {0} - indexes : {1}'.format(len(positions), len(indexes)))
+
+        # get blendShape targets
+        targets = self.targets()
+
+        # get target plugs
+        inputTargetPlug = self.MFn().findPlug('inputTarget', True)
+        inputTargetGrpPlug = inputTargetPlug.elementByLogicalIndex(0).child(0)
+
+        shapeIndex = targets.index(name) if name in targets else inputTargetGrpPlug.numElements()
+        inputTargetItemPlug = inputTargetGrpPlug.elementByLogicalIndex(shapeIndex).child(0).elementByLogicalIndex(6000)
+
+        inputPointsTargetPlug = inputTargetItemPlug.child(3)
+        inputComponentTargetPlug = inputTargetItemPlug.child(4)
+
+        # set pointArray attribute - deltas
+        pointArray = maya.api.OpenMaya.MPointArray(positions)
+        pointArrayData = maya.api.OpenMaya.MFnPointArrayData()
+        pointArrayObject = pointArrayData.create(pointArray)
+
+        inputPointsTargetPlug.setMObject(pointArrayObject)
+
+        # set componentList attribute - indexes
+        singleIndexedComponent = maya.api.OpenMaya.MFnSingleIndexedComponent()
+        singleIndexedComponent.create(maya.api.OpenMaya.MFn.kMeshVertComponent)
+        singleIndexedComponent.addElements(indexes)
+        componentListData = maya.api.OpenMaya.MFnComponentListData()
+        componentListData.create()
+        componentListData.add(singleIndexedComponent.object())
+
+        inputComponentTargetPlug.setMObject(componentListData.object())
+
+        # set weight value and alias
+        maya.cmds.setAttr('{0}.weight[{1}]'.format(self.name(), shapeIndex), 0.0, keyable=True)
+        maya.cmds.aliasAttr(name, '{0}.weight[{1}]'.format(self.name(), shapeIndex))
+
+    def targets(self):
+        """get the list of targets of the blendShape
+
+        :return: targets of the blendShape
+        :rtype: list[str]
+        """
+
+        # return
+        return maya.cmds.listAttr(self.name(), multi=True, string='weight') or []
 
 
 class SkinCluster(GeometryFilter):

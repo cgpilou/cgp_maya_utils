@@ -158,7 +158,7 @@ class ObjFile(cgp_generic_utils.files.File):
         :rtype: str
         """
 
-        # load shape form directory
+        # load shape from directory
         loadPrefix = 'importer_obj_{0}'.format(self.baseName())
         loadGeo = '{0}_Mesh'.format(loadPrefix)
 

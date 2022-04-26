@@ -26,8 +26,8 @@ from ._components._nurbsSurface import IsoparmU, IsoparmV, SurfacePatch, Surface
 from ._nodes._animCurve import AnimCurve, AnimCurveTA, AnimCurveTL, AnimCurveTU
 from ._nodes._constraint import (Constraint, AimConstraint, OrientConstraint, ParentConstraint,
                                  PointConstraint, ScaleConstraint)
-from ._nodes._generic import Node, DagNode, Reference
-from ._nodes._geometryFilter import GeometryFilter, SkinCluster
+from ._nodes._generic import Node, DagNode, ObjectSet, Reference
+from ._nodes._geometryFilter import GeometryFilter, BlendShape, SkinCluster
 from ._nodes._ik import IkEffector, IkHandle
 from ._nodes._shape import Shape, NurbsCurve, NurbsSurface, Mesh
 from ._nodes._transform import Transform, Joint
@@ -61,6 +61,7 @@ __miscTypes = {'namespace': Namespace,
 
 __nodeTypes = {'node': Node,
                'dagNode': DagNode,
+               'objectSet': ObjectSet,
                'reference': Reference,
                'animCurve': AnimCurve,
                'animCurveTA': AnimCurveTA,
@@ -73,6 +74,7 @@ __nodeTypes = {'node': Node,
                'pointConstraint': PointConstraint,
                'scaleConstraint': ScaleConstraint,
                'geometryFilter': GeometryFilter,
+               'blendShape': BlendShape,
                'skinCluster': SkinCluster,
                'ikEffector': IkEffector,
                'ikHandle': IkHandle,
@@ -120,7 +122,7 @@ __all__ = ['attribute', 'connection', 'createAttribute', 'getAttributes', 'getNo
            'Constraint', 'AimConstraint', 'OrientConstraint', 'ParentConstraint',
            'PointConstraint', 'ScaleConstraint',
            'Node', 'DagNode', 'Reference',
-           'GeometryFilter', 'SkinCluster',
+           'GeometryFilter', 'BlendShape', 'SkinCluster',
            'IkEffector', 'IkHandle',
            'Shape', 'NurbsCurve', 'NurbsSurface', 'Mesh',
            'Transform', 'Joint']

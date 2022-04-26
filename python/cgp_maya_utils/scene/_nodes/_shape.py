@@ -15,7 +15,6 @@ import cgp_maya_utils.decorators
 import cgp_maya_utils.constants
 import cgp_maya_utils.scene._api
 from . import _generic
-from . import _transform
 
 
 # BASE OBJECT #
@@ -204,6 +203,16 @@ class Shape(_generic.DagNode):
 
         # return
         return bool(maya.cmds.findDeformers(self.name()))
+
+    def isIntermediate(self):
+        """check if the shape is intermediate
+
+        :return: ``True`` : the shape is intermediate - ``False`` : the shape is not intermediate
+        :rtype: bool
+        """
+
+        # return
+        return self.attribute('intermediateObject').value()
 
     def match(self, targetShape, worldSpace=False):
         """match the shape to the target shape

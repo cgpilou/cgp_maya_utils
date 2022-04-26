@@ -2,6 +2,9 @@
 generic object library
 """
 
+# imports python
+import re
+
 # imports third-parties
 import maya.cmds
 import maya.api.OpenMaya
@@ -515,6 +518,53 @@ class DagNode(Node):
 
     # COMMANDS #
 
+    def children(self, namePattern=None, nodeTypes=None, asExactNodeTypes=False, recursive=False):
+        """get children nodes of the node
+
+        :param namePattern: pattern the child name has to match - ex: '*pelvis*'
+        :type namePattern: str
+
+        :param nodeTypes: node types the child has to match
+        :type nodeTypes: list[str]
+
+        :param asExactNodeTypes: ``True`` : list only exact node types - ``False`` : all types inheriting node types
+        :type asExactNodeTypes: bool
+
+        :param recursive: ``True`` : get children recursively - ``False`` : get only direct children
+        :type recursive: bool
+
+        :return: the children nodes
+        :rtype: list[:class:`rdo_maya_rig_utils.scene.DagNode`]
+        """
+
+        # init
+        parentName = self.name()
+
+        # query relatives
+        if nodeTypes:
+            nodes = [relative
+                     for nodeType in nodeTypes
+                     for relative in maya.cmds.listRelatives(parentName,
+                                                             allDescendents=recursive,
+                                                             path=True,
+                                                             type=nodeType) or []]
+        else:
+            nodes = maya.cmds.listRelatives(parentName,
+                                            allDescendents=recursive,
+                                            path=True) or []
+
+        # filter with regex
+        if namePattern:
+            nameRegex = namePattern.replace("*", ".*")
+            nodes = [node for node in nodes if re.match(nameRegex, node.split("|")[-1])]
+
+        # apply exact type option
+        if asExactNodeTypes and nodeTypes:
+            nodes = [node for node in nodes if maya.cmds.nodeType(node) in nodeTypes]
+
+        # return
+        return [cgp_maya_utils.scene._api.node(item) for item in nodes]
+
     def fullName(self):
         """the full name of the node
 
@@ -569,6 +619,142 @@ class DagNode(Node):
 
         # execute
         maya.cmds.parent(self.name(), parent)
+
+
+class ObjectSet(Node):
+    """ObjectSet class
+    """
+
+    # ATTRIBUTES
+
+    _nodeType = 'objectSet'
+
+    # OBJECT COMMANDS #
+
+    @classmethod
+    def create(cls, members=None, connections=None, attributeValues=None, name=None, **__):
+        """create the object set
+
+        :param members: connections to set on the created object set
+        :type members: list[str]
+
+        :param connections: connections to set on the created object set
+        :type connections: list[tuple[str]]
+
+        :param attributeValues: attribute values to set on the created object set
+        :type attributeValues: dict
+
+        :param name: name of the created object set
+        :type name: str
+
+        :return: the node object
+        :rtype: :class:`rdo_maya_rig_utils.scene.ObjectSet`
+        """
+
+        # init
+        objectSet = super(ObjectSet, cls).create(cls._nodeType,
+                                                 connections=connections,
+                                                 attributeValues=attributeValues,
+                                                 name=name)
+
+        # set members
+        objectSet.setMembers(members)
+
+        # return
+        return objectSet
+
+    # COMMANDS #
+
+    def addMembers(self, nodes):
+        """add nodes to the existing members of the object set
+
+        :param nodes: nodes to add as members
+        :type nodes: list[str or :class:`rdo_maya_rig_utils.scene.Node`]
+        """
+
+        # return
+        maya.cmds.sets(nodes, edit=True, addElement=self.name())
+
+    def clear(self):
+        """clear the object set of all members
+        """
+
+        # execute
+        maya.cmds.sets(edit=True, clear=self.name())
+
+    def data(self):
+        """get the data of the object set
+
+        :return: the data
+        :rtype: dict
+        """
+
+        # init
+        data = super(ObjectSet, self).data()
+
+        # update data
+        data['members'] = [member.name() for member in self.members()]
+
+        # return
+        return data
+
+    def delete(self):
+        """delete the object set
+        """
+
+        # disconnect connections to avoid autodeletion of empty set members
+        for connection in self.connections():
+            connection.disconnect()
+
+        # delete
+        super(ObjectSet, self).delete()
+
+    def hasMember(self, node):
+        """check if the node is a member of the set
+
+        :param node: node to check
+        :type node: str or :class:`rdo_maya_rig_utils.scene.Node`
+
+        :return: ``True`` : node is a member of the set - ``False`` : the node is not a member of the set
+        :rtype: bool
+        """
+
+        # return
+        return maya.cmds.sets(node, isMember=self.name())
+
+    def members(self):
+        """get the members of the object set
+
+        :return: list of nodes contained in the set
+        :rtype: list[:class:`rdo_maya_rig_utils.scene.Node`]
+        """
+
+        # return
+        return [cgp_maya_utils.scene._api.node(node)
+                for node in maya.cmds.sets(self.name(), query=True)]
+
+    def removeMembers(self, nodes):
+        """remove the nodes from the object set
+
+        :param nodes: nodes to remove from the set
+        :type nodes: list[str or :class:`rdo_maya_rig_utils.scene.Node`]
+        """
+
+        # execute
+        maya.cmds.sets(nodes, remove=self.name())
+
+    def setMembers(self, nodes):
+        """set the members of the object set
+
+        :param nodes: nodes to set as members
+        :type nodes: list[str or :class`rdo_maya_rig_utils.scene.Node`]
+        """
+
+        # clear set
+        self.clear()
+
+        # add members
+        self.addMembers(nodes)
 
 
 class Reference(Node):
