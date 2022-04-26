@@ -14,7 +14,7 @@ def registerFileTypes():
     """
 
     # imports file modules
-    from . _maya import MayaFile, MaFile, MbFile, ObjFile
+    from ._maya import MayaFile, MaFile, MbFile, ObjFile
 
     fileTypes = {'mayaFile': MayaFile,
                  'ma': MaFile,

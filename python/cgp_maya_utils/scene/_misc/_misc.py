@@ -317,6 +317,20 @@ class Scene(object):
         return maya.cmds.currentTime(query=True)
 
     @staticmethod
+    def file_():
+        """get the file of the scene
+
+        :return: the file of the scene
+        :rtype: :class:`cgp_generic_utils.files.File`
+        """
+
+        # get the path
+        path = maya.cmds.file(query=True, sceneName=True) or None
+
+        # return
+        return cgp_generic_utils.files.entity(path) if path else None
+
+    @staticmethod
     def mainWindow():
         """get the maya main window
 
@@ -419,20 +433,6 @@ class Scene(object):
 
         # execute
         maya.cmds.playbackOptions(minTime=value)
-
-    @staticmethod
-    def file_():
-        """get the file of the scene
-
-        :return: the file of the scene
-        :rtype: :class:`cgp_generic_utils.files.File`
-        """
-
-        # get the path
-        path = maya.cmds.file(query=True, sceneName=True) or None
-
-        # return
-        return cgp_generic_utils.files.entity(path) if path else None
 
     @staticmethod
     def viewport():

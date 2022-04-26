@@ -385,7 +385,7 @@ def getNodes(namePattern=None, nodeTypes=None, asExactNodeTypes=False):
     :param nodeTypes: types of nodes to get in the scene
     :type nodeTypes: list[str]
 
-    :param asExactNodeTypes: defines whether or not the command will list exactType nodes
+    :param asExactNodeTypes: ``True`` : list only exact node types - ``False`` : all types inheriting node types
     :type asExactNodeTypes: bool
 
     :return: the listed Nodes

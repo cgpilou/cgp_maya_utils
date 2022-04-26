@@ -40,6 +40,7 @@ class Constraint(_generic.DagNode):
         data['drivers'] = [xform.name() for xform in self.driverTransforms()]
         data['driven'] = self.drivenTransform().name()
         data['drivenAttributes'] = [attr.name() for attr in self.drivenAttributes()]
+        data['weights'] = self.weights()
 
         # return
         return data
@@ -140,6 +141,38 @@ class Constraint(_generic.DagNode):
         # return
         return self.driverTransforms() and self.drivenTransform()
 
+    def setWeights(self, values):
+        """set the weights of the constraint
+
+        :param values: the values of the weights to set
+        :type values: list[int, float]
+        """
+
+        # execute
+        for index, weightAttribute in enumerate(self.weightAttributes()):
+            weightAttribute.setValue(values[index])
+
+    def weights(self):
+        """get the weights of the constraint
+
+        :return: the weights of the constraint
+        :rtype: list[float]
+        """
+
+        # return
+        return [attribute.value() for attribute in self.weightAttributes()]
+
+    def weightAttributes(self):
+        """get the weight attributes
+
+        :return: the weight attributes
+        :rtype: list[:class:`cgp_maya_utils.scene.DoubleAttribute`]
+        """
+
+        # return
+        return [cgp_maya_utils.scene.DoubleAttribute('{0}.{1}'.format(self.name(), weightAlias))
+                for weightAlias in getattr(maya.cmds, self._nodeType)(self.name(), query=True, weightAliasList=True)]
+
     # PRIVATE COMMANDS #
 
     def _driverInputs(self):
@@ -231,8 +264,15 @@ class AimConstraint(Constraint):
     # COMMANDS #
 
     @classmethod
-    def create(cls, drivers, driven, drivenAttributes=None, maintainOffset=False,
-               attributeValues=None, name=None, **__):
+    def create(cls,
+               drivers,
+               driven,
+               drivenAttributes=None,
+               maintainOffset=False,
+               weights=None,
+               attributeValues=None,
+               name=None,
+               **__):
         """create an aimConstraint
 
         :param drivers: transforms driving the constraint
@@ -246,6 +286,9 @@ class AimConstraint(Constraint):
 
         :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
         :type maintainOffset: bool
+
+        :param weights: values of the weight attributes of the constraint
+        :type weights: list[int, float]
 
         :param attributeValues: attribute values to set on the constraint
         :type attributeValues: dict
@@ -266,7 +309,7 @@ class AimConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('{0} can\'t be aimConstraint'.format(driven))
+            raise RuntimeError('no valid driven attributes specified')
 
         # get skip attributes
         skipAttributes = []
@@ -316,14 +359,18 @@ class AimConstraint(Constraint):
                                        skip=skipAttributes,
                                        **data)[0]
 
-        cstrObject = cls(node)
+        constraintObject = cls(node)
 
         # apply attributeValues
         if attributeValues:
-            cstrObject.setAttributeValues(attributeValues)
+            constraintObject.setAttributeValues(attributeValues)
+
+        # set weights
+        if weights:
+            constraintObject.setWeights(weights)
 
         # return
-        return cstrObject
+        return constraintObject
 
     # PRIVATE COMMANDS #
 
@@ -380,8 +427,15 @@ class OrientConstraint(Constraint):
     # COMMANDS #
 
     @classmethod
-    def create(cls, drivers, driven, drivenAttributes=None, maintainOffset=False,
-               attributeValues=None, name=None, **__):
+    def create(cls,
+               drivers,
+               driven,
+               drivenAttributes=None,
+               maintainOffset=False,
+               weights=None,
+               attributeValues=None,
+               name=None,
+               **__):
         """create an orientConstraint
 
         :param drivers: transforms driving the constraint
@@ -395,6 +449,9 @@ class OrientConstraint(Constraint):
 
         :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
         :type maintainOffset: bool
+
+        :param weights: values of the weight attributes of the constraint
+        :type weights: list[int, float]
 
         :param attributeValues: attribute values to set on the constraint
         :type attributeValues: dict
@@ -415,7 +472,7 @@ class OrientConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('{0} can\'t be orientConstraint'.format(driven))
+            raise RuntimeError('no valid driven attributes specified')
 
         # get skip attributes
         skipAttributes = []
@@ -431,14 +488,18 @@ class OrientConstraint(Constraint):
                                           maintainOffset=maintainOffset,
                                           skip=skipAttributes)[0]
 
-        cstrObject = cls(node)
+        constraintObject = cls(node)
 
         # apply attributeValues
         if attributeValues:
-            cstrObject.setAttributeValues(attributeValues)
+            constraintObject.setAttributeValues(attributeValues)
+
+        # set weights
+        if weights:
+            constraintObject.setWeights(weights)
 
         # return
-        return cstrObject
+        return constraintObject
 
     # PRIVATE COMMANDS #
 
@@ -491,8 +552,15 @@ class ParentConstraint(Constraint):
     # COMMANDS #
 
     @classmethod
-    def create(cls, drivers, driven, drivenAttributes=None, maintainOffset=False,
-               attributeValues=None, name=None, **__):
+    def create(cls,
+               drivers,
+               driven,
+               drivenAttributes=None,
+               maintainOffset=False,
+               weights=None,
+               attributeValues=None,
+               name=None,
+               **__):
         """create an parentConstraint
 
         :param drivers: transforms driving the constraint
@@ -506,6 +574,9 @@ class ParentConstraint(Constraint):
 
         :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
         :type maintainOffset: bool
+
+        :param weights: values of the weight attributes of the constraint
+        :type weights: list[int, float]
 
         :param attributeValues: attribute values to set on the constraint
         :type attributeValues: dict
@@ -526,7 +597,7 @@ class ParentConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('{0} can\'t be parentConstraint'.format(driven))
+            raise RuntimeError('no valid driven attributes specified')
 
         # get skip attributes
         skipAttributes = {'t': [], 'r': []}
@@ -544,14 +615,18 @@ class ParentConstraint(Constraint):
                                           skipTranslate=skipAttributes['t'],
                                           skipRotate=skipAttributes['r'])[0]
 
-        cstrObject = cls(node)
+        constraintObject = cls(node)
 
         # apply attributeValues
         if attributeValues:
-            cstrObject.setAttributeValues(attributeValues)
+            constraintObject.setAttributeValues(attributeValues)
+
+        # set weights
+        if weights:
+            constraintObject.setWeights(weights)
 
         # return
-        return cstrObject
+        return constraintObject
 
     # PRIVATE COMMANDS #
 
@@ -606,8 +681,15 @@ class PointConstraint(Constraint):
     # COMMANDS #
 
     @classmethod
-    def create(cls, drivers, driven, drivenAttributes=None, maintainOffset=False,
-               attributeValues=None, name=None, **__):
+    def create(cls,
+               drivers,
+               driven,
+               drivenAttributes=None,
+               maintainOffset=False,
+               weights=None,
+               attributeValues=None,
+               name=None,
+               **__):
         """create a pointConstraint
 
         :param drivers: transforms driving the constraint
@@ -621,6 +703,9 @@ class PointConstraint(Constraint):
 
         :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
         :type maintainOffset: bool
+
+        :param weights: values of the weight attributes of the constraint
+        :type weights: list[int, float]
 
         :param attributeValues: attribute values to set on the constraint
         :type attributeValues: dict
@@ -641,7 +726,7 @@ class PointConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('{0} can\'t be aimConstraint'.format(driven))
+            raise RuntimeError('no valid driven attributes specified')
 
         # get skip attributes
         skipAttributes = []
@@ -657,14 +742,18 @@ class PointConstraint(Constraint):
                                          maintainOffset=maintainOffset,
                                          skip=skipAttributes)[0]
 
-        cstrObject = cls(node)
+        constraintObject = cls(node)
 
         # apply attributeValues
         if attributeValues:
-            cstrObject.setAttributeValues(attributeValues)
+            constraintObject.setAttributeValues(attributeValues)
+
+        # set weights
+        if weights:
+            constraintObject.setWeights(weights)
 
         # return
-        return cstrObject
+        return constraintObject
 
     # PRIVATE COMMANDS #
 
@@ -719,8 +808,15 @@ class ScaleConstraint(Constraint):
     # COMMANDS #
 
     @classmethod
-    def create(cls, drivers, driven, drivenAttributes=None, maintainOffset=False,
-               attributeValues=None, name=None, **__):
+    def create(cls,
+               drivers,
+               driven,
+               drivenAttributes=None,
+               maintainOffset=False,
+               weights=None,
+               attributeValues=None,
+               name=None,
+               **__):
         """create a scaleConstraint
 
         :param drivers: transforms driving the constraint
@@ -734,6 +830,9 @@ class ScaleConstraint(Constraint):
 
         :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
         :type maintainOffset: bool
+
+        :param weights: values of the weight attributes of the constraint
+        :type weights: list[int, float]
 
         :param attributeValues: attribute values to set on the constraint
         :type attributeValues: dict
@@ -754,7 +853,7 @@ class ScaleConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('{0} can\'t be aimConstraint'.format(driven))
+            raise RuntimeError('no valid driven attributes specified')
 
         # get skip attributes
         skipAttributes = []
@@ -775,6 +874,10 @@ class ScaleConstraint(Constraint):
         # apply attributeValues
         if attributeValues:
             constraintObject.setAttributeValues(attributeValues)
+
+        # set weights
+        if weights:
+            constraintObject.setWeights(weights)
 
         # return
         return constraintObject
