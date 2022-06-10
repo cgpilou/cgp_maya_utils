@@ -193,6 +193,19 @@ class Plugin(object):
 
     # COMMANDS #
 
+    def file_(self):
+        """the plugin file
+
+        :return: the plugin file
+        :rtype: :class:`cgp_generic_utils.files.File`
+        """
+
+        # get plugin path
+        path = maya.cmds.pluginInfo(self.name(), query=True, path=True)
+
+        # return
+        return cgp_generic_utils.files.entity(path)
+
     def isAutoLoaded(self):
         """check if the plugin is autoLoaded
 
@@ -233,19 +246,6 @@ class Plugin(object):
 
         # return
         return self._name
-
-    def path(self):
-        """the path of the plugin file
-
-        :return: the path of the plugin file
-        :rtype: :class:`cgp_generic_utils.files.File`
-        """
-
-        # get plugin path
-        path = maya.cmds.pluginInfo(self.name(), query=True, path=True)
-
-        # return
-        return cgp_generic_utils.files.entity(path)
 
     def unload(self, deleteNodes=False):
         """unload the plugin

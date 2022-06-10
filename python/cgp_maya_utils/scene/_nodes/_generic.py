@@ -27,7 +27,6 @@ class Node(object):
     # ATTRIBUTES #
 
     _nodeType = 'baseNode'
-    _MFn = maya.api.OpenMaya.MFnDependencyNode()
 
     # INIT #
 
@@ -40,6 +39,7 @@ class Node(object):
 
         # init
         self._mObject = cgp_maya_utils.api.MayaObject(name)
+        self._mFn = maya.api.OpenMaya.MFnDependencyNode(self.MObject())
 
     def __eq__(self, node):
         """check if the Node is identical to the other node
@@ -139,7 +139,7 @@ class Node(object):
         # return
         return cgp_maya_utils.scene._api.attribute('{0}.{1}'.format(self.name(), attribute))
 
-    def attributes(self, attributeTypes=None, attributeTypesIncluded=True, onlyUserDefined=False):
+    def attributes(self, attributeTypes=None, attributeTypesIncluded=True, areUserDefined=None):
         """the attributes of the node from attribute types
 
         :param attributeTypes: types of attributes to get - All if nothing is specified
@@ -149,8 +149,9 @@ class Node(object):
                                        ``False`` : attribute types are excluded
         :type attributeTypesIncluded: bool
 
-        :param onlyUserDefined: ``True`` : only user defined attributes - ``False`` : not only user defined attributes
-        :type onlyUserDefined: bool
+        :param areUserDefined: ``True`` : only user defined attributes - ``False`` : only not user defined attributes -
+                               ``None`` : all attributes
+        :type areUserDefined: bool
 
         :return: the attributes
         :rtype: list[:class:`cgp_maya_utils.scene.Attribute`]
@@ -182,7 +183,8 @@ class Node(object):
         for attribute in maya.cmds.listAttr(self.name()):
 
             # continue
-            if onlyUserDefined and attribute not in userDefinedAttributes:
+            if (areUserDefined is True and attribute not in userDefinedAttributes or
+                    areUserDefined is False and attribute in userDefinedAttributes):
                 continue
 
             # get full attribute
@@ -335,7 +337,7 @@ class Node(object):
         # return
         return maya.cmds.referenceQuery(self.name(), isNodeReferenced=True)
 
-    def MFn(self):
+    def mFn(self):
         """the function set of the node
 
         :return: the function set of the node
@@ -343,7 +345,7 @@ class Node(object):
         """
 
         # return
-        return self._MFn.setObject(self.MObject())
+        return self._mFn
 
     def MObject(self):
         """the MObject of the node
@@ -363,7 +365,7 @@ class Node(object):
         """
 
         # return
-        return self.MFn().name()
+        return self.mFn().name()
 
     def namespace(self):
         """the namespace of the node
@@ -402,7 +404,7 @@ class Node(object):
         newNode = cgp_maya_utils.scene._api.createNode(data)
 
         # update node
-        self._MFn = newNode.MFn()
+        self._mFn = newNode.mFn()
 
     def reference(self):
         """the reference of the node
@@ -502,7 +504,6 @@ class DagNode(Node):
     # ATTRIBUTES #
 
     _nodeType = 'dagNode'
-    _MFn = maya.api.OpenMaya.MFnDagNode()
 
     # INIT #
 
@@ -515,6 +516,7 @@ class DagNode(Node):
 
         # init
         super(DagNode, self).__init__(name)
+        self._mFn = maya.api.OpenMaya.MFnDagNode(self.MObject())
 
     # COMMANDS #
 
@@ -573,17 +575,17 @@ class DagNode(Node):
         """
 
         # return
-        return self.MFn().fullPathName()
+        return self.mFn().fullPathName()
 
     def name(self):
-        """the the shortest unique name of the node
+        """the shortest unique name of the node
 
         :return: the name of the node
         :rtype: str
         """
 
         # return
-        return self.MFn().partialPathName()
+        return self.mFn().partialPathName()
 
     def parent(self):
         """the parent of the dag node

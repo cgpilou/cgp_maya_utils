@@ -25,7 +25,19 @@ class Transform(_generic.DagNode):
     # ATTRIBUTES #
 
     _nodeType = 'transform'
-    _MFn = maya.api.OpenMaya.MFnTransform()
+
+    # INIT #
+
+    def __init__(self, name):
+        """Transform class initialization
+
+        :param name: name of the transform
+        :type name: str
+        """
+
+        # init
+        super(Transform, self).__init__(name)
+        self._mFn = maya.api.OpenMaya.MFnTransform(self.MObject())
 
     # OBJECT COMMANDS #
 
@@ -576,7 +588,7 @@ class Transform(_generic.DagNode):
 
         # execute
         for shapeType in queryShapeTypes:
-            for shape in maya.cmds.listRelatives(self.name(), shapes=True, type=shapeType) or []:
+            for shape in maya.cmds.listRelatives(self.name(), shapes=True, type=shapeType, fullPath=True) or []:
                 returnShapes.append(cgp_maya_utils.scene.node(shape))
 
         # return

@@ -274,8 +274,15 @@ class Attribute(object):
         :type fullName: str
         """
 
-        # set fullName
-        self._fullName = fullName
+        # get node and attribute names
+        nodeName, attributeName = fullName.split('.', 1)
+
+        # update attribute name if necessary
+        # if "." not in attributeName and "[" not in attributeName:
+        attributeName = maya.cmds.attributeName(fullName, long=True)
+
+        # set the attribute
+        self._fullName = "{}.{}".format(nodeName, attributeName)
 
     def __eq__(self, attribute):
         """check if the Attribute is identical to the other attribute

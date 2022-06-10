@@ -208,7 +208,7 @@ class BlendShape(GeometryFilter):
         targets = self.targets()
 
         # get target plugs
-        inputTargetPlug = self.MFn().findPlug('inputTarget', True)
+        inputTargetPlug = self.mFn().findPlug('inputTarget', True)
         inputTargetGrpPlug = inputTargetPlug.elementByLogicalIndex(0).child(0)
 
         shapeIndex = targets.index(name) if name in targets else inputTargetGrpPlug.numElements()

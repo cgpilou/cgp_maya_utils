@@ -175,7 +175,7 @@ class Shape(_generic.DagNode):
         validDeformers = []
 
         # get all deformers
-        allDeformers = maya.cmds.findDeformers(self.name())
+        allDeformers = maya.cmds.findDeformers(self.name()) or []
 
         # get deformerTypes to query
         if not geometryFilterTypes and geometryFilterTypesIncluded:
