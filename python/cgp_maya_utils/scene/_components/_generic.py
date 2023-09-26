@@ -2,7 +2,6 @@
 generic component object library
 """
 
-
 # imports python
 import re
 
@@ -10,6 +9,7 @@ import re
 import maya.cmds
 
 # imports local
+import cgp_maya_utils.constants
 import cgp_maya_utils.scene._api
 
 
@@ -19,7 +19,7 @@ class Component(object):
 
     # ATTRIBUTES #
 
-    _componentType = 'component'
+    _TYPE = cgp_maya_utils.constants.ComponentType.COMPONENT
 
     # INIT #
 
@@ -36,7 +36,7 @@ class Component(object):
     def __eq__(self, component):
         """check if the Component is identical to the other component
 
-        :param component: component to compare to
+        :param component: component to compare the component to
         :type component: str or :class:`cgp_maya_utils.scene.Component`
 
         :return: ``True`` : components are identical - ``False`` : components are different
@@ -47,12 +47,12 @@ class Component(object):
         return self.fullName() == str(component)
 
     def __ne__(self, component):
-        """check if the Component is different to the other component
+        """check if the Component is different from the other component
 
-        :param component: component to compare to
+        :param component: component to compare the component to
         :type component: str or :class:`cgp_maya_utils.scene.Component`
 
-        :return: ``True`` : components are different - ``False`` : components identical
+        :return: ``True`` : components are different - ``False`` : components are identical
         :rtype: bool
         """
 
@@ -60,7 +60,7 @@ class Component(object):
         return self.fullName() != str(component)
 
     def __repr__(self):
-        """the representation of the component
+        """get the representation of the component
 
         :return: the representation of the component
         :rtype: str
@@ -70,9 +70,9 @@ class Component(object):
         return '{0}(\'{1}\')'.format(self.__class__.__name__, self.fullName())
 
     def __str__(self):
-        """the print of the component
+        """get the string representation of the node
 
-        :return: the print of the component
+        :return: the string representation of the component
         :rtype: str
         """
 
@@ -82,7 +82,7 @@ class Component(object):
     # COMMANDS #
 
     def componentType(self):
-        """the type of the component
+        """get the type of the component
 
         :return: the type of the component
         :rtype: str
@@ -92,7 +92,7 @@ class Component(object):
         return self.name().split('[')[0]
 
     def indexes(self):
-        """the indexes of the component
+        """get the indexes of the component
 
         :return: the indexes of the component
         :rtype: list[int]
@@ -104,7 +104,7 @@ class Component(object):
                 else [int(s) for s in re.findall(r'\d+', self.name())])
 
     def fullName(self):
-        """the full name of the component
+        """get the full name of the component
 
         :return: the full name of the component - ``node.component[*]`` or ``node.component[*][*]``
         :rtype: str
@@ -114,7 +114,7 @@ class Component(object):
         return self._fullName
 
     def name(self):
-        """the name of the component
+        """get the name of the component
 
         :return: the name of the component - ``component[*]`` or ``component[*][*]``
         :rtype: str
@@ -123,11 +123,21 @@ class Component(object):
         # return
         return self._fullName.split('.')[-1]
 
+    def select(self):
+        """select the component
+        """
+
+        # allow component selection
+        maya.cmds.hilite(self.shape())
+
+        # select the component
+        maya.cmds.select(self)
+
     def shape(self):
-        """the shape of the component
+        """get the shape of the component
 
         :return: the shape of the component
-        :rtype: :class:`cgp_maya_utils.scene.Shape`
+        :rtype: :class:`cgp_maya_utils.scene.Shape` or :class:`cgp_maya_utils.scene.Mesh`
         """
 
         # return
@@ -140,14 +150,14 @@ class TransformComponent(Component):
 
     # ATTRIBUTES #
 
-    _componentType = 'transformComponent'
+    _TYPE = cgp_maya_utils.constants.ComponentType.TRANSFORM_COMPONENT
 
     # INIT #
 
     def __init__(self, fullName):
         """TransformComponent class initialization
 
-        :param fullName: full name of the transform component - ``shape.component[*]`` or ``shape.component[*][*]``
+        :param fullName: full name of the transform component - ``shape.component[*]`` or ``shape.component[*][*]`
         :type fullName: str
         """
 
@@ -157,9 +167,10 @@ class TransformComponent(Component):
     # COMMANDS #
 
     def position(self, worldSpace=False):
-        """the position of the transform component
+        """get the position of the transform component
 
-        :param worldSpace: ``True`` : positions will be worldSpace - ``False`` : positions will be local
+        :param worldSpace: ``True`` : position will be queried in worldSpace -
+                           ``False`` : position will be queried in local
         :type worldSpace: bool
 
         :return: the position of the component

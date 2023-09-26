@@ -3,9 +3,31 @@ maya decorators - also usable as contexts
 """
 
 # imports local
-from ._decorators import (DisableAutoKey, DisableViewport, KeepCurrentFrame, KeepCurrentFrameRange,
-                          KeepCurrentSelection, NamespaceContext, UndoChunk)
+from ._decorators import (DisableAutokey,
+                          DisableCycleCheck,
+                          DisableExpressions,
+                          DisableIntermediateStatus,
+                          DisableViewport,
+                          KeepCurrentAnimationLayer,
+                          KeepCurrentFrame,
+                          KeepCurrentFrameRange,
+                          KeepSelection,
+                          KeepOptionVars,
+                          LoadPlugin,
+                          NamespaceContext,
+                          UndoChunk)
 
 
-__all__ = ['DisableAutoKey', 'DisableViewport', 'KeepCurrentFrame', 'KeepCurrentFrameRange', 'KeepCurrentSelection',
-           'NamespaceContext', 'UndoChunk']
+__all__ = ['DisableAutokey',
+           'DisableCycleCheck',
+           'DisableExpressions',
+           'DisableIntermediateStatus',
+           'DisableViewport',
+           'KeepCurrentAnimationLayer',
+           'KeepCurrentFrame',
+           'KeepCurrentFrameRange',
+           'KeepSelection',
+           'KeepOptionVars',
+           'LoadPlugin',
+           'NamespaceContext',
+           'UndoChunk']

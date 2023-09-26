@@ -8,8 +8,6 @@ import re
 # imports third-parties
 import maya.cmds
 import maya.api.OpenMaya
-import cgp_generic_utils.files
-import cgp_generic_utils.constants
 
 # imports local
 import cgp_maya_utils.api
@@ -25,9 +23,9 @@ class Node(object):
     """
 
     # ATTRIBUTES #
-
-    _nodeType = 'baseNode'
-    _MFn = maya.api.OpenMaya.MFnDependencyNode()
+    
+    _MFN = maya.api.OpenMaya.MFnDependencyNode()
+    _TYPE = cgp_maya_utils.constants.NodeType.BASE_NODE
 
     # INIT #
 
@@ -42,9 +40,9 @@ class Node(object):
         self._mObject = cgp_maya_utils.api.MayaObject(name)
 
     def __eq__(self, node):
-        """check if the Node is identical to the other node
+        """check if the node is identical to the other node
 
-        :param node: node to compare to
+        :param node: node to compare the node to
         :type node: str or :class:`cgp_maya_utils.scene.Node`
 
         :return: ``True`` : nodes are identical - ``False`` : nodes are different
@@ -52,12 +50,12 @@ class Node(object):
         """
 
         # return
-        return self.name() == str(node)
+        return self.fullName() == str(node)
 
     def __ne__(self, node):
-        """check if the Node is different to the other node
+        """check if the node is different to the other node
 
-        :param node: node to compare to
+        :param node: node to compare the node to
         :type node: str or :class:`cgp_maya_utils.scene.Node`
 
         :return: ``True`` : nodes are different - ``False`` : nodes are identical
@@ -65,47 +63,47 @@ class Node(object):
         """
 
         # return
-        return self.name() != str(node)
+        return self.fullName() != str(node)
 
     def __repr__(self):
-        """the representation of the node
+        """get the representation of the node
 
         :return: the representation of the node
         :rtype: str
         """
 
         # return
-        return '{0}(\'{1}\')'.format(self.__class__.__name__, self.name())
+        return '{0}({1!r})'.format(self.__class__.__name__, self.fullName())
 
     def __str__(self):
-        """the print of the node
+        """get the string representation of the node
 
-        :return: the print of the node
+        :return: the string representation of the node
         :rtype: str
         """
 
         # return
-        return self.name()
+        return self.fullName()
 
-    # OBJECT COMMANDS #
+    # STATIC COMMANDS #
 
-    @classmethod
-    def create(cls, nodeType, connections=None, attributeValues=None, name=None, **__):
+    @staticmethod
+    def create(nodeType, connections=None, attributeValues=None, name=None, **__):
         """create a node
 
         :param nodeType: type of node to create
-        :type nodeType: str
+        :type nodeType: :class:`cgp_maya_utils.constants.NodeType`
 
         :param connections: connections to set on the created node
         :type connections: list[tuple[str]]
 
-        :param attributeValues: attribute values to set on the node
+        :param attributeValues: attribute values to set on the created node
         :type attributeValues: dict
 
-        :param name: name of the node
+        :param name: name of the created node
         :type name: str
 
-        :return: the created node
+        :return: the node object
         :rtype: :class:`cgp_maya_utils.scene.Node`
         """
 
@@ -122,141 +120,199 @@ class Node(object):
             nodeObject.setConnections(connections)
 
         # return
-        return node
+        return nodeObject
 
     # COMMANDS #
 
-    def attribute(self, attribute):
-        """the attribute of the node from an attribute name
+    def addAttribute(self,
+                     attributeType,
+                     name,
+                     value=None,
+                     connectionSource=None,
+                     connectionDestinations=None,
+                     **extraData):
+        """create an attribute on the node
 
-        :param attribute: name of the attribute to get
-        :type attribute: str
+        :param attributeType: the type of the attribute to create
+        :type attributeType: :class:`cgp_maya_utils.constants.AttributeType`
 
-        :return: the attribute object
+        :param name: name of the attribute to create
+        :type name: str
+
+        :param value: value to set on the attribute
+        :type value: any
+
+        :param connectionSource: attribute that will be connected as source - `node.attribute`
+        :type connectionSource: str or :class:`cgp_maya_utils.scene.Attribute`
+
+        :param connectionDestinations: attributes that will be connected as destination - `[node1.attribute1, node2.attribute2 ...]`
+        :type connectionDestinations: list[str] or list[:class:`cgp_maya_utils.scene.Attribute`]
+
+        :return: the created attribute
         :rtype: :class:`cgp_maya_utils.scene.Attribute`
         """
 
-        # return
-        return cgp_maya_utils.scene._api.attribute('{0}.{1}'.format(self.name(), attribute))
+        # validate parameters
+        if self.hasAttribute(name):
+            raise ValueError('The node \'{}\' already has an attribute named \'{}\''.format(self, name))
 
-    def attributes(self, attributeTypes=None, attributeTypesIncluded=True, onlyUserDefined=False):
-        """the attributes of the node from attribute types
+        # prepare attribute's data
+        data = {'attributeType': attributeType,
+                'node': self,
+                'name': name,
+                'value': value,
+                'connectionSource': connectionSource,
+                'connectionDestinations': connectionDestinations}
+
+        # create and return the new attribute
+        return cgp_maya_utils.scene._api.createAttribute(data, **extraData)
+
+    def attribute(self, attribute):
+        """get the attribute of the node from an attribute name
+
+        :param attribute: the name of the attribute to get
+        :type attribute: str
+
+        :return: the attribute object
+        :rtype: Attribute
+        """
+
+        # return
+        return cgp_maya_utils.scene._api.attribute('{0}.{1}'.format(self.fullName(), attribute))
+
+    def attributes(self, namePattern=None, attributeTypes=None, attributeTypesIncluded=True):
+        """get the attributes of the node from attribute types
+
+        :param namePattern: the name pattern the attributes have to match
+        :type namePattern: str
 
         :param attributeTypes: types of attributes to get - All if nothing is specified
-        :type attributeTypes: list[str]
+        :type attributeTypes: list[str or :class:`cgp_maya_utils.constants.AttributeType`]
 
-        :param attributeTypesIncluded: ``True`` : attribute types are included -
-                                       ``False`` : attribute types are excluded
+        :param attributeTypesIncluded: ``True`` : attribute types are included - ``False`` : attribute types are excluded
         :type attributeTypesIncluded: bool
 
-        :param onlyUserDefined: ``True`` : only user defined attributes - ``False`` : not only user defined attributes
-        :type onlyUserDefined: bool
-
         :return: the attributes
-        :rtype: list[:class:`cgp_maya_utils.scene.Attribute`]
+        :rtype: list[Attribute]
         """
 
         # init
-        returnAttributes = []
-        queryAttributeTypes = []
-        userDefinedAttributes = maya.cmds.listAttr(self.name(), userDefined=True)
+        attrTypes = []
+        nodeName = self.fullName()
 
         # errors
         if attributeTypes:
-            for attributeType in attributeTypes:
-                if attributeType not in cgp_maya_utils.constants.AttributeType.ALL:
+            for attrType in attributeTypes:
+                if attrType not in cgp_maya_utils.constants.AttributeType.ALL:
                     raise ValueError('{0} is not a valid type - {1}'
-                                     .format(attributeType, cgp_maya_utils.constants.AttributeType.ALL))
+                                     .format(attrType, cgp_maya_utils.constants.AttributeType.ALL))
 
-        # get attrTypes to query
+        # return an empty list if no attribute types are valid
+        if not attributeTypes and not attributeTypesIncluded:
+            return []
+
+        # list attribute names
+        allAttributes = (maya.cmds.listAttr(nodeName, hasData=True, string=namePattern)
+                         if namePattern
+                         else maya.cmds.listAttr(nodeName)) or []
+
+        # prune bad results
+        validNames = []
+        validAttributes = []
+        internalAttributes = maya.cmds.attributeInfo(nodeName, internal=True) or []
+        for name in allAttributes:
+
+            # keep the first parent attribute (prune components of TdataCompound attributes)
+            name = name.split(".", 1)[0]
+
+            # ignore internal attributes
+            if name in internalAttributes:
+                continue
+
+            # generate full name
+            attributeFullName = "{}.{}".format(nodeName, name)
+
+            # ignore doubles
+            if attributeFullName in validNames:
+                continue
+
+            # store only strings to speed up the above doubles searching
+            validNames.append(attributeFullName)
+
+            # add the attribute to the valid list
+            validAttributes.append(cgp_maya_utils.scene._api.attribute(attributeFullName))
+
+        # if there is no need to check types, just return data as it is
         if not attributeTypes and attributeTypesIncluded:
-            queryAttributeTypes = cgp_maya_utils.constants.AttributeType.ALL
+            return validAttributes
 
+        # get types to keep
         elif attributeTypes and attributeTypesIncluded:
-            queryAttributeTypes = attributeTypes
-
+            attrTypes = attributeTypes
         elif attributeTypes and not attributeTypesIncluded:
-            queryAttributeTypes = set(cgp_maya_utils.constants.AttributeType.ALL) - set(attributeTypes)
+            attrTypes = list(set(cgp_maya_utils.constants.AttributeType.ALL) - set(attributeTypes))
 
-        # execute
-        for attribute in maya.cmds.listAttr(self.name()):
-
-            # continue
-            if onlyUserDefined and attribute not in userDefinedAttributes:
-                continue
-
-            # get full attribute
-            fullAttribute = '{0}.{1}'.format(self.name(), attribute)
-
-            # get attribute type
-            # try except work around for unrecognized attributes like publishedNodeInfo.publishedNode
-            try:
-                attributeType = maya.cmds.getAttr(fullAttribute, type=True)
-            except (ValueError, RuntimeError):
-                continue
-
-            # update
-            if attributeType in queryAttributeTypes:
-                returnAttributes.append(cgp_maya_utils.scene._api.attribute(fullAttribute))
-
-        # return
-        return returnAttributes
+        # return data matching types
+        return [attribute for attribute in validAttributes if attribute.attributeType() in attrTypes]
 
     def attributeValues(self):
-        """the values of the available attributes of the node
+        """get the attribute values of the node
 
         :return: the attribute values
         :rtype: dict
         """
 
-        # init
-        data = {}
+        # return gettable attributes
+        return {attribute.name(): attribute.value()
+                for attribute in self.attributes()
+                if attribute.isGettable()}
 
-        # get attributeValues data
-        for attribute in self._availableAttributes():
-            data[attribute] = self.attribute(attribute).value()
-
-        # return
-        return data
-
-    def connections(self, attributes=None, sources=True, destinations=True, nodeTypes=None, nodeTypesIncluded=True,
+    def connections(self,
+                    attributes=None,
+                    sources=True,
+                    destinations=True,
+                    nodeTypes=None,
+                    nodeTypesIncluded=True,
                     skipConversionNodes=False):
-        """the source and destination connections of the node
+        """get the source and destination connections of the node
 
-        :param attributes: attributes of the node to get the connections from - get all if nothing specified
+        :param attributes: list of attributes to get the connections from - all if nothing specified
         :type attributes: list[str]
 
-        :param sources: ``True`` : get the source connections - ``False`` : does not get the source connections
+        :param sources: ``True`` : the command gets the source connections -
+                        ``False`` : the command does not get the source connections
         :type sources: bool
 
-        :param destinations: ``True`` : get the destination connections -
-                             ``False`` : does not get the destination connections
+        :param destinations: ``True`` : the command gets the destination connections -
+                             ``False`` : the command does not get the destination connections
         :type destinations: bool
 
-        :param nodeTypes: types of nodes to get the connections from - All if nothing is specified
+        :param nodeTypes: types of nodes used to get the connections - all if nothing is specified
         :type nodeTypes: list[str]
 
-        :param nodeTypesIncluded: ``True`` : include specified node types - ``False`` : exclude specified node types
+        :param nodeTypesIncluded: ``True`` : include specified node types -
+                                  ``False`` : exclude specified node types
         :type nodeTypesIncluded: bool
 
-        :param skipConversionNodes: ``True`` : conversion nodes are skipped - ``False`` conversion nodes are not skipped
+        :param skipConversionNodes: ``True`` : conversion nodes are skipped -
+                                    ``False`` : conversion nodes are not skipped
         :type skipConversionNodes: bool
 
-        :return: the connections of the node
+        :return: the connections
         :rtype: list[:class:`cgp_maya_utils.scene.Connection`]
         """
 
         # return
-        return cgp_maya_utils.scene.Connection.get(self.name(),
-                                                   attributes=attributes,
-                                                   sources=sources,
-                                                   destinations=destinations,
-                                                   nodeTypes=nodeTypes,
-                                                   nodeTypesIncluded=nodeTypesIncluded,
-                                                   skipConversionNodes=skipConversionNodes)
+        return cgp_maya_utils.scene._api.getConnections(self.fullName(),
+                                                        attributes=attributes,
+                                                        sources=sources,
+                                                        destinations=destinations,
+                                                        nodeTypes=nodeTypes,
+                                                        nodeTypesIncluded=nodeTypesIncluded,
+                                                        skipConversionNodes=skipConversionNodes)
 
     def data(self):
-        """data necessary to store the node on disk and/or recreate it from scratch
+        """get data necessary to store the node on disk and/or recreate it from scratch
 
         :return: the data of the node
         :rtype: dict
@@ -273,120 +329,154 @@ class Node(object):
         """
 
         # execute
-        maya.cmds.delete(self.name())
+        maya.cmds.delete(self.fullName())
 
     def duplicate(self):
         """duplicate the node
 
         :return: the duplicated node
-        :rtype: :class:`cgp_maya_utils.scene.Node`
+        :rtype: Node
         """
 
         # return
-        return cgp_maya_utils.scene._api.node(maya.cmds.duplicate(self.name())[0])
+        return self.__class__(maya.cmds.duplicate(self.fullName())[0])
+
+    def fullName(self):
+        """get the full name of the node
+
+        :return: the full name of the node
+        :rtype: str
+        """
+
+        # return
+        return self.name()
 
     def hasAttribute(self, attribute):
         """check if the node has the attribute
 
-        :param attribute: the attribute to check
+        :param attribute: the name of the attribute to check
         :type attribute: str
 
-        :return: ``True`` : it has the attribute - ``False`` : it does not have the attribute
+        :return: ``True`` : the node has the attribute - ``False`` : the node does not have the attribute
         :rtype: bool
         """
 
-        # return
-        return maya.cmds.attributeQuery(attribute, exists=True, node=self.name())
+        # init
+        fullName = '{}.{}'.format(self.fullName(), attribute)
 
-    def hasAttributes(self, attributes):
+        # return
+        try:
+            maya.cmds.getAttr(fullName, type=True)
+            return True
+        except ValueError:
+            return False
+
+    def isAttributeValid(self, attributes):
         """check if the node has the attributes
 
         :param attributes: attributes to check on the node
         :type attributes: list[str]
 
-        :return: ``True`` : it has the attributes - ``False`` : it does not have the attributes
+        :return: ``True`` : the node has the attributes ``False`` : the node does not have the attributes
         :rtype: bool
         """
 
         # init
-        attrs = maya.cmds.listAttr(self.name())
+        attrs = maya.cmds.listAttr(self.fullName())
         specifiedAttributes = set(attrs) & set(attributes)
 
         # return
         return sorted(specifiedAttributes) == sorted(attributes)
 
-    def isLocked(self):
-        """check if the node is locked
+    def isDeleted(self):
+        """check if the node has been deleted
 
-        :return: ``True`` : it is locked - ``False`` : it is not locked
+        :return: ``True`` : the node has been deleted ``False`` : the node exists in the scene
         :rtype: bool
         """
 
         # return
-        return maya.cmds.lockNode(self.name(), query=True)[0]
+        return not maya.cmds.objExists(self.fullName())
+
+    def isLocked(self):
+        """check if the node is locked
+
+        :return: ``True`` : the node is locked - ``False`` : the node is not locked
+        :rtype: bool
+        """
+
+        # return
+        return maya.cmds.lockNode(self.fullName(), query=True)[0]
 
     def isReferenced(self):
         """check if the node is referenced
 
-        :return: ``True`` : it is referenced - ``False`` : it is not referenced
+        :return: ``True`` : the node is referenced - ``False`` : the node is not referenced
         :rtype: bool
         """
 
         # return
-        return maya.cmds.referenceQuery(self.name(), isNodeReferenced=True)
+        return maya.cmds.referenceQuery(self.fullName(), isNodeReferenced=True)
 
     def MFn(self):
-        """the function set of the node
+        """get the function set of the node
 
         :return: the function set of the node
         :rtype: :class:`maya.api.OpenMaya.MFn`
         """
 
         # return
-        return self._MFn.setObject(self.MObject())
+        return self._MFN.setObject(self.MObject())
 
     def MObject(self):
-        """the MObject of the node
+        """get the MObject of the node
 
         :return: the MObject of the node
-        :rtype: :class:`maya.api.OpenMaya.MObject`
+        :rtype: :class:`cgp_maya_utils.api.MayaObject`
         """
 
         # return
         return self._mObject
 
-    def name(self):
-        """the name of the node
+    def name(self, withNamespace=True):
+        """get the name of the node
+
+        :param withNamespace: ``True`` : The name is returned with its namespace if there is any
+                              ``False`` : The name is return without its namespace if there is any
+        :type withNamespace: bool
 
         :return: the name of the node
         :rtype: str
         """
 
+        # get name with namespace
+        name = self.MFn().name()
+
         # return
-        return self.MFn().name()
+        return name if withNamespace else maya.api.OpenMaya.MNamespace.stripNamespaceFromName(name)
 
     def namespace(self):
-        """the namespace of the node
+        """get the namespace of the node
 
         :return: the namespace of the node
         :rtype: :class:`cgp_maya_utils.scene.Namespace`
         """
 
         # get namespace
-        namespace = self.name().rpartition('|')[-1].rpartition(':')[0] or ':'
+        namespace = maya.api.OpenMaya.MNamespace.getNamespaceFromName(self.name()) or ':'
 
         # return
         return cgp_maya_utils.scene._api.namespace(namespace)
 
     def nodeType(self):
-        """the type of the node
+        """get the type of the node
 
         :return: the type of the node
         :rtype: str
         """
 
         # return
-        return maya.cmds.nodeType(self.name())
+        return maya.cmds.nodeType(self.fullName())
 
     def rebuild(self):
         """rebuild the node
@@ -402,32 +492,38 @@ class Node(object):
         newNode = cgp_maya_utils.scene._api.createNode(data)
 
         # update node
-        self._MFn = newNode.MFn()
+        self._MFN = newNode.MFn()
 
     def reference(self):
-        """the reference of the node
+        """get the reference of the node if existing
 
         :return: the reference object
         :rtype: :class:`cgp_maya_utils.scene.Reference`
         """
 
         # execute
-        if maya.cmds.referenceQuery(self.name(), isNodeReferenced=True):
-            refNode = maya.cmds.referenceQuery(self.name(), referenceNode=True)
+        if maya.cmds.referenceQuery(self.fullName(), isNodeReferenced=True):
+            refNode = maya.cmds.referenceQuery(self.fullName(), referenceNode=True)
             return Reference(refNode)
 
         # return
         return None
 
-    def select(self):
+    def select(self, isSelected=True):
         """select the node
+
+        :param isSelected: define if the the Node has to be selected or not - default is True
+        :type isSelected: bool
         """
 
         # execute
-        maya.cmds.select(self.name(), replace=True)
+        if isSelected:
+            maya.cmds.select(self.fullName(), replace=True)
+        else:
+            maya.cmds.select(self.fullName(), deselect=True)
 
     def setConnections(self, connections):
-        """set the connections of the node
+        """set the connections
 
         :param connections: connection data used to set the connections
         :type connections: list[tuple[str]]
@@ -437,7 +533,7 @@ class Node(object):
         for source, destination in connections:
 
             # check if connection is settable
-            if not self.name() in source or not self.name() in destination:
+            if not self.fullName() in source or not self.fullName() in destination:
                 continue
 
             if not maya.cmds.objExists(source) or not maya.cmds.objExists(destination):
@@ -455,7 +551,7 @@ class Node(object):
         """
 
         # execute
-        maya.cmds.lockNode(self.name(), lock=isLocked)
+        maya.cmds.lockNode(self.fullName(), lock=isLocked)
 
     def setName(self, name):
         """set the name of the node
@@ -465,34 +561,57 @@ class Node(object):
         """
 
         # execute
-        maya.cmds.rename(self.name(), name)
+        maya.cmds.rename(self.fullName(), name)
+
+    def setNamespace(self, namespace):
+        """set the namespace of the node
+
+        :param namespace: new namespace of the node
+        :type namespace: str
+        """
+
+        # execute
+        maya.cmds.rename(self.fullName(), '{}:{}'.format(namespace, self.name(withNamespace=False)))
 
     def setAttributeValues(self, attributeValues):
-        """set the values of the attributes of the node
+        """set the values of the attributes to the node
 
         :param attributeValues: values to set to the attributes of the node - ``{attr1: value1, attr2: value2 ...}``
         :type attributeValues: dict
         """
 
+        # init
+        failedCommands = []
+
         # execute
-        for attribute, attributeValue in attributeValues.items():
-            self.attribute(attribute).setValue(attributeValue)
+        for attributeName, attributeValue in attributeValues.items():
 
-    # PRIVATE COMMANDS #
+            # bypass non-existing attributes
+            if not self.hasAttribute(attributeName):
+                continue
 
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
+            # get the attribute
+            attribute = self.attribute(attributeName)
 
-        :return: the available attributes
-        :rtype: list[str]
-        """
+            # bypass if value is already correct
+            if attributeValue == attribute.value():
+                continue
 
-        # TODO: update availableAttributes to gather all attributes used for setting - specially the userDefined ones
+            # bypass non settable attributes
+            if not attribute.isSettable():
+                continue
 
-        # return
-        return ['caching',
-                'frozen',
-                'nodeState']
+            # set the attribute value (store the one who raised errors)
+            try:
+                attribute.setValue(attributeValue)
+            except RuntimeError:
+                failedCommands.append(attribute.fullName())
+                continue
+
+        # warn user that some attributes have not been set
+        if failedCommands:
+            maya.cmds.warning("Some attributes have not been updated because of a maya command error: "
+                              "{}".format(", ".join(failedCommands)))
 
 
 class DagNode(Node):
@@ -501,30 +620,18 @@ class DagNode(Node):
 
     # ATTRIBUTES #
 
-    _nodeType = 'dagNode'
-    _MFn = maya.api.OpenMaya.MFnDagNode()
-
-    # INIT #
-
-    def __init__(self, name):
-        """DagNode class initialization
-
-        :param name: name of the dagNode
-        :type name: str
-        """
-
-        # init
-        super(DagNode, self).__init__(name)
+    _MFN = maya.api.OpenMaya.MFnDagNode()
+    _TYPE = cgp_maya_utils.constants.NodeType.DAG_NODE
 
     # COMMANDS #
 
     def children(self, namePattern=None, nodeTypes=None, asExactNodeTypes=False, recursive=False):
         """get children nodes of the node
 
-        :param namePattern: pattern the child name has to match - ex: '*pelvis*'
+        :param namePattern: the pattern the child name has to match - ex: '*pelvis*'
         :type namePattern: str
 
-        :param nodeTypes: node types the child has to match
+        :param nodeTypes: the node types the child has to match
         :type nodeTypes: list[str]
 
         :param asExactNodeTypes: ``True`` : list only exact node types - ``False`` : all types inheriting node types
@@ -534,24 +641,18 @@ class DagNode(Node):
         :type recursive: bool
 
         :return: the children nodes
-        :rtype: list[:class:`rdo_maya_rig_utils.scene.DagNode`]
+        :rtype: list[DagNode]
         """
 
         # init
-        parentName = self.name()
+        parentName = self.fullName()
 
         # query relatives
         if nodeTypes:
-            nodes = [relative
-                     for nodeType in nodeTypes
-                     for relative in maya.cmds.listRelatives(parentName,
-                                                             allDescendents=recursive,
-                                                             path=True,
-                                                             type=nodeType) or []]
+            nodes = [relative for nodeType in nodeTypes for relative
+                     in maya.cmds.listRelatives(parentName, allDescendents=recursive, path=True, type=nodeType) or []]
         else:
-            nodes = maya.cmds.listRelatives(parentName,
-                                            allDescendents=recursive,
-                                            path=True) or []
+            nodes = maya.cmds.listRelatives(parentName, allDescendents=recursive, path=True) or []
 
         # filter with regex
         if namePattern:
@@ -566,7 +667,7 @@ class DagNode(Node):
         return [cgp_maya_utils.scene._api.node(item) for item in nodes]
 
     def fullName(self):
-        """the full name of the node
+        """get the full name of the node
 
         :return: the full name of the node
         :rtype: str
@@ -575,90 +676,134 @@ class DagNode(Node):
         # return
         return self.MFn().fullPathName()
 
-    def name(self):
-        """the the shortest unique name of the node
-
-        :return: the name of the node
-        :rtype: str
-        """
-
-        # return
-        return self.MFn().partialPathName()
-
     def parent(self):
-        """the parent of the dag node
+        """get the parent of the DagNode
 
-        :return: the parent of the dag node
-        :rtype: :class:`cgp_maya_utils.scene.DagNode`
+        :return: the parent of the DagNode
+        :rtype: DagNode
         """
 
         # execute
-        parents = maya.cmds.listRelatives(self.name(), parent=True)
+        parents = maya.cmds.listRelatives(self.fullName(), parent=True, fullPath=True)
 
         # return
         return cgp_maya_utils.scene._api.node(parents[0]) if parents else None
 
-    def setParent(self, parent=None):
-        """set the parent of the dag node
+    def setParentingIndex(self, value, relative=False):
+        """set the node parenting index - parenting index is the position of the node under its parent in the outliner
 
-        :param parent: dag node to parent the dag node to - If None, parent is the root of the scene
-        :type parent: str or :class:`cgp_maya_utils.scene.DagNode`
+        :param value: value to set on the parenting index
+        :type value: int
+
+        :param relative: ``True`` : index is updated relative to the current position of the node -
+                         ``False`` : index is set as absolute position of the node
+        :type relative: bool
         """
 
+        # in case of absolute index
+        if not relative:
+
+            # get siblings
+            siblings = self.parent().children(recursive=False)
+
+            # check if the index is in range
+            if (value > 0 and abs(value) > len(siblings) - 1) or (value < 0 and abs(value) > len(siblings)):
+                raise IndexError("Sibling absolute index out of range. "
+                                 "Current index limits are: [{}, {}]".format(-len(siblings), len(siblings) - 1))
+
+            # maya does not supply an absolute reordering
+            # so we need to move the node to the top and then move it in relative mode
+            maya.cmds.reorder(self.fullName(), front=True)
+
+            # modulo to accept both positive and negative indexes (python lists like)
+            value = value % len(siblings)
+
+        # move up/down node in siblings
+        if value:
+            maya.cmds.reorder(self.fullName(), relative=value)
+
+    def setParent(self, parent=None, maintainOffset=True):
+        """set the parent of the DagNode
+
+        :param parent: DagNode used to parent the DagNode to - If None, parent to scene root
+        :type parent: str or :class:`cgp_maya_utils.scene.DagNode`
+
+        :param maintainOffset: ``True`` : dagNode current position is maintained
+                               ``False`` : dagNode current position is not maintained
+        :type maintainOffset: bool
+        """
+
+        # init
+        fullName = self.fullName()
+
         # parent to world
-        if parent is None and maya.cmds.listRelatives(self.name(), parent=True):
-            maya.cmds.parent(self.name(), world=True)
+        if parent is None and maya.cmds.listRelatives(fullName, parent=True):
+            maya.cmds.parent(fullName, world=True)
             return
 
         # update parent
         parent = str(parent)
 
         # return
-        if not maya.cmds.objExists(parent) or parent == self.parent():
+        if not maya.cmds.objExists(parent) or str(parent) == self.parent():
             return
 
         # execute
-        maya.cmds.parent(self.name(), parent)
+        if maintainOffset:
+            maya.cmds.parent(fullName, parent)
+        else:
+            maya.cmds.parent(fullName, parent, relative=True)
+
+    def parentingIndex(self):
+        """get the node parenting index - parenting index is the position of the node under its parent in the outliner
+
+        :return: the parenting index
+        :rtype: int
+        """
+
+        # return
+        return self.parent().children(recursive=False).index(self)
 
 
 class ObjectSet(Node):
-    """ObjectSet class
+    """node object that manipulates an ``objectSet`` node
     """
 
     # ATTRIBUTES
 
-    _nodeType = 'objectSet'
+    _TYPE = cgp_maya_utils.constants.NodeType.OBJECT_SET
 
     # OBJECT COMMANDS #
 
     @classmethod
     def create(cls, members=None, connections=None, attributeValues=None, name=None, **__):
-        """create the object set
+        """create an objectSet
 
-        :param members: connections to set on the created object set
-        :type members: list[str]
+        :param members: nodes to add as members to the objectSet
+        :type members: list[str or :class`cgp_maya_utils.scene.Node`]
 
-        :param connections: connections to set on the created object set
+        :param connections: connections to set on the created objectSet
         :type connections: list[tuple[str]]
 
-        :param attributeValues: attribute values to set on the created object set
+        :param attributeValues: attribute values to set on the created objectSet
         :type attributeValues: dict
 
-        :param name: name of the created object set
+        :param name: name of the created objectSet
         :type name: str
 
         :return: the node object
-        :rtype: :class:`rdo_maya_rig_utils.scene.ObjectSet`
+        :rtype: :class:`cgp_maya_utils.scene.ObjectSet`
         """
 
         # init
-        objectSet = super(ObjectSet, cls).create(cls._nodeType,
+        objectSet = super(ObjectSet, cls).create(cls._TYPE,
                                                  connections=connections,
                                                  attributeValues=attributeValues,
                                                  name=name)
 
         # set members
-        objectSet.setMembers(members)
+        if members:
+            objectSet.setMembers(members)
 
         # return
         return objectSet
@@ -666,26 +811,26 @@ class ObjectSet(Node):
     # COMMANDS #
 
     def addMembers(self, nodes):
-        """add nodes to the existing members of the object set
+        """add nodes to the existing members of the objectSet
 
         :param nodes: nodes to add as members
-        :type nodes: list[str or :class:`rdo_maya_rig_utils.scene.Node`]
+        :type nodes: list[str or :class:`cgp_maya_utils.scene.Node`]
         """
 
         # return
-        maya.cmds.sets(nodes, edit=True, addElement=self.name())
+        maya.cmds.sets(nodes, edit=True, addElement=self.fullName())
 
     def clear(self):
-        """clear the object set of all members
+        """clear the objectSet of all members
         """
 
         # execute
-        maya.cmds.sets(edit=True, clear=self.name())
+        maya.cmds.sets(edit=True, clear=self.fullName())
 
     def data(self):
-        """get the data of the object set
+        """get the data necessary to store the objectSet node on disk and/or recreate it from scratch
 
-        :return: the data
+        :return: the data of the objectSet node
         :rtype: dict
         """
 
@@ -693,16 +838,16 @@ class ObjectSet(Node):
         data = super(ObjectSet, self).data()
 
         # update data
-        data['members'] = [member.name() for member in self.members()]
+        data['members'] = [member.fullName() for member in self.members()]
 
         # return
         return data
 
     def delete(self):
-        """delete the object set
+        """delete the objectSet
         """
 
-        # disconnect connections to avoid autodeletion of empty set members
+        # disconnect connections to avoid auto deletion of empty set members
         for connection in self.connections():
             connection.disconnect()
 
@@ -710,44 +855,44 @@ class ObjectSet(Node):
         super(ObjectSet, self).delete()
 
     def hasMember(self, node):
-        """check if the node is a member of the set
+        """check if the node is a member of the objectSet
 
         :param node: node to check
-        :type node: str or :class:`rdo_maya_rig_utils.scene.Node`
+        :type node: str or :class:`cgp_maya_utils.scene.Node`
 
-        :return: ``True`` : node is a member of the set - ``False`` : the node is not a member of the set
+        :return: ``True`` : node is a member of the objectSet - ``False`` : the node is not a member of the objectSet
         :rtype: bool
         """
 
         # return
-        return maya.cmds.sets(node, isMember=self.name())
+        return maya.cmds.sets(node, isMember=self.fullName())
 
     def members(self):
-        """get the members of the object set
+        """get the members of the objectSet
 
-        :return: list of nodes contained in the set
-        :rtype: list[:class:`rdo_maya_rig_utils.scene.Node`]
+        :return: the nodes contained in the objectSet
+        :rtype: list[Node]
         """
 
         # return
         return [cgp_maya_utils.scene._api.node(node)
-                for node in maya.cmds.sets(self.name(), query=True)]
+                for node in maya.cmds.sets(self.fullName(), query=True) or []]
 
     def removeMembers(self, nodes):
-        """remove the nodes from the object set
+        """remove the nodes from the objectSet
 
-        :param nodes: nodes to remove from the set
-        :type nodes: list[str or :class:`rdo_maya_rig_utils.scene.Node`]
+        :param nodes: nodes to remove from the objectSet
+        :type nodes: list[str or :class:`cgp_maya_utils.scene.Node`]
         """
 
         # execute
-        maya.cmds.sets(nodes, remove=self.name())
+        maya.cmds.sets(nodes, remove=self.fullName())
 
     def setMembers(self, nodes):
-        """set the members of the object set
+        """set the members of the objectSet
 
-        :param nodes: nodes to set as members
-        :type nodes: list[str or :class`rdo_maya_rig_utils.scene.Node`]
+        :param nodes: nodes to set as members of the objectSet
+        :type nodes: list[str or :class`cgp_maya_utils.scene.Node`]
         """
 
         # clear set
@@ -763,28 +908,16 @@ class Reference(Node):
 
     # ATTRIBUTES
 
-    _nodeType = 'reference'
-
-    # INIT #
-
-    def __init__(self, name):
-        """Reference class initialization
-
-        :param name: name of the reference node
-        :type name: str
-        """
-
-        # init
-        super(Reference, self).__init__(name)
+    _TYPE = cgp_maya_utils.constants.NodeType.REFERENCE
 
     # OBJECT COMMANDS #
 
     @classmethod
-    def create(cls, path=None, namespace=None, **__):
+    def create(cls, path=None, namespace=None, **kwargs):
         """create a reference
 
         :param path: path of the file to reference
-        :type path: str or :class:`cgp_maya_utils.files.MayaFile`
+        :type path: str
 
         :param namespace: namespace of the created reference
         :type namespace: str
@@ -811,7 +944,7 @@ class Reference(Node):
     # COMMANDS #
 
     def data(self):
-        """data necessary to store the reference node on disk and/or recreate it from scratch
+        """get the data necessary to store the reference node on disk and/or recreate it from scratch
 
         :return: the data of the reference
         :rtype: dict
@@ -835,20 +968,19 @@ class Reference(Node):
         if self.file_():
             maya.cmds.file(self.file_(), removeReference=True)
         else:
-            maya.cmds.lockNode(self.name(), lock=False)
-            maya.cmds.delete(self.name())
+            maya.cmds.lockNode(self.fullName(), lock=False)
+            maya.cmds.delete(self.fullName())
 
     def file_(self):
-        """the file associated to the reference node
+        """get the file associated with the reference node
 
         :return: the file of the reference node
-        :rtype: :class:`cgp_maya_utils.scene.MayaFile`
+        :rtype: str
         """
 
         # execute
         try:
-            fileName = maya.cmds.referenceQuery(self.name(), filename=True)
-            return cgp_generic_utils.files.entity(fileName)
+            return maya.cmds.referenceQuery(self.fullName(), filename=True)
         except RuntimeError:
             return None
 
@@ -865,10 +997,10 @@ class Reference(Node):
             return
 
         # get namespace
-        namespace = self.namespace()
+        namespace = self.namespace().name()
 
         # import objects
-        copyFile = maya.cmds.referenceQuery(self.name(), filename=True, withoutCopyNumber=False)
+        copyFile = maya.cmds.referenceQuery(self.fullName(), filename=True, withoutCopyNumber=False)
         maya.cmds.file(copyFile, importReference=True)
 
         # clean namespace
@@ -882,32 +1014,46 @@ class Reference(Node):
             # remove namespace
             maya.cmds.namespace(removeNamespace=namespace)
 
-    def namespace(self):
-        """the namespace of the node
+    def isLoaded(self):
+        """check if the reference is loaded
 
-        :return: the namespace of the node
+        :return: ``True`` : the reference is loaded - ``False`` : the reference is unloaded
+        :rtype: bool
+        """
+
+        # return
+        return maya.cmds.referenceQuery(self.fullName(), isLoaded=True)
+
+    def load(self):
+        """load the reference
+        """
+
+        # execute
+        maya.cmds.file(self.file_(), loadReferenceDepth='asPrefs', loadReference=self.fullName())
+
+    def namespace(self):
+        """get the namespace of the reference
+
+        :return: the namespace of the reference
         :rtype: :class:`cgp_maya_utils.scene.Namespace`
         """
 
         # get namespace
-        copyFile = maya.cmds.referenceQuery(self.name(), filename=True, withoutCopyNumber=False)
+        copyFile = maya.cmds.referenceQuery(self.fullName(), filename=True, withoutCopyNumber=False)
         namespace = maya.cmds.file(copyFile, query=True, namespace=True)
 
         # return
         return cgp_maya_utils.scene._api.namespace(namespace) if self.file_() else None
 
     def setNamespace(self, namespace, renameNode=True):
-        """set the namespace
+        """set the namespace of the reference
 
-        :param namespace: namespace to set
-        :type namespace: str or :class:`cgp_maya_utils.scene.Namespace`
+        :param namespace: namespace to set on the reference
+        :type namespace: str
 
         :param renameNode: ``True`` : the reference node is renamed - ``False`` : the reference node is not renamed
         :type renameNode: bool
         """
-
-        # init
-        namespace = str(namespace)
 
         # errors
         if self.namespace == namespace:
@@ -915,14 +1061,14 @@ class Reference(Node):
             return
 
         if not self.file_():
-            maya.cmds.warning("can't set namespace on reference that doesn't have a file path set")
+            maya.cmds.warning('can\'t set namespace on reference that doesn\'t have a file path set')
             return
 
         if maya.cmds.namespace(exists=namespace):
             maya.cmds.warning('{0} is already existing'.format(namespace))
             return
 
-        # check if the reference node is locked
+        # get info
         isLocked = self.isLocked()
 
         # set namespace
@@ -933,3 +1079,10 @@ class Reference(Node):
             self.setLock(False)
             self.setName('{0}RN'.format(namespace))
             self.setLock(isLocked)
+
+    def unload(self):
+        """unload the reference
+        """
+
+        # execute
+        maya.cmds.file(self.file_(), unloadReference=self.fullName())

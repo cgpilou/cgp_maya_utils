@@ -6,255 +6,11 @@ generic attribute object library
 import maya.cmds
 
 # import local
+import cgp_maya_utils.constants
 import cgp_maya_utils.scene._api
 
 
 # GENERIC OBJECTS #
-
-
-class Connection(object):
-    """connection object that manipulates live or virtual connection between two attributes
-    """
-
-    # INIT #
-
-    def __init__(self, source, destination):
-        """Connection class initialization
-
-        :param source: attribute that drives the connection - ``node.attribute`` or ``Attribute``
-        :type source: str or :class:`cgp_maya_utils.scene.Attribute`
-
-        :param destination: attribute that is driven by the connection - ``node.attribute`` or ``Attribute``
-        :type destination: str or :class:`cgp_maya_utils.scene.Attribute`
-        """
-
-        # errors
-        if str(source) == str(destination):
-            raise ValueError('Connection can\'t have identical source and destination')
-
-        # set attributes
-        self._source = (source
-                        if isinstance(source, Attribute)
-                        else cgp_maya_utils.scene._api.attribute(source))
-
-        self._destination = (destination
-                             if isinstance(destination, Attribute)
-                             else cgp_maya_utils.scene._api.attribute(destination))
-
-    def __repr__(self):
-        """the representation of the connection
-
-        :return: the representation of the connection
-        :rtype: str
-        """
-
-        # return
-        return '{0}(\'{1}\', \'{2}\')'.format(self.__class__.__name__,
-                                              self.source().fullName(),
-                                              self.destination().fullName())
-
-    # OBJECT COMMANDS #
-
-    @classmethod
-    def create(cls, source, destination):
-        """create a connection
-
-        :param source: attribute that drives the connection - ``node.attribute``
-        :type source: str
-
-        :param destination: attribute that is driven by the connection - ``node.attribute``
-        :type destination: str
-
-        :return: the created connection
-        :rtype: :class:`cgp_maya_utils.scene.Connection`
-        """
-
-        # init
-        connectionObject = cls(source, destination)
-        connectionObject.connect()
-
-        # return
-        return connectionObject
-
-    @classmethod
-    def get(cls, node, attributes=None, sources=True, destinations=True, nodeTypes=None,
-            nodeTypesIncluded=True, skipConversionNodes=False):
-        """get the connections from the specified node
-
-        :param node: node to get the connections from
-        :type node: str or :class:`cgp_maya_utils.scene.Node`
-
-        :param attributes: list of attributes to get the connections from - get all if nothing specified
-        :type attributes: list[str]
-
-        :param sources: ``True`` : get the source connections - ``False`` does not get source connections
-        :type sources: bool
-
-        :param destinations: ``True`` : get the destination connections - ``False`` does not get destination connections
-        :type destinations: bool
-
-        :param nodeTypes: types of nodes used to get the connections - All if nothing is specified
-        :type nodeTypes: list[str]
-
-        :param nodeTypesIncluded: ``True`` : include specified node types - ``False`` : exclude specified node types
-        :type nodeTypesIncluded: bool
-
-        :param skipConversionNodes: ``True`` : conversion nodes are skipped - ``False`` conversion nodes are not skipped
-        :type skipConversionNodes: bool
-
-        :return: the connections
-        :rtype: list[:class:`cgp_maya_utils.scene.Connection`]
-        """
-
-        # init
-        toQueries = ['{0}.{1}'.format(node, attr) for attr in attributes] if attributes else [str(node)]
-        nodeTypes = nodeTypes or []
-        data = []
-
-        # get source connections
-        sourceConnections = maya.cmds.listConnections(toQueries,
-                                                      source=True,
-                                                      destination=False,
-                                                      plugs=True,
-                                                      skipConversionNodes=skipConversionNodes,
-                                                      connections=True) or [] if sources else []
-
-        # get destination connections
-        destinationConnections = maya.cmds.listConnections(toQueries,
-                                                           source=False,
-                                                           destination=True,
-                                                           plugs=True,
-                                                           skipConversionNodes=skipConversionNodes,
-                                                           connections=True) or [] if destinations else []
-
-        # sort connections
-        sourceConnections = reversed(zip(*[iter(reversed(sourceConnections))] * 2))
-        destinationConnections = reversed(zip(*[iter(destinationConnections)] * 2))
-
-        # execute
-        for index, connections in enumerate([sourceConnections, destinationConnections]):
-            for connection in connections:
-
-                # check if not is a connectedType
-                isValid = bool(set(maya.cmds.nodeType(connection[index], inherited=True)) & set(nodeTypes))
-
-                # update
-                if (not nodeTypes and nodeTypesIncluded
-                        or nodeTypes and nodeTypesIncluded and isValid
-                        or nodeTypes and not nodeTypesIncluded and not isValid):
-                    data.append(cls(*connection))
-
-        # return
-        return data
-
-    # COMMANDS #
-
-    def connect(self):
-        """connect the connection
-        """
-
-        # execute
-        if not self.isConnected():
-            maya.cmds.connectAttr(self.source(), self.destination(), force=True)
-
-    def data(self):
-        """data necessary to store the compound attribute on disk and/or recreate it from scratch
-
-        :return: the data of the connection
-        :rtype: tuple
-        """
-
-        # return
-        return self.source().fullName(), self.destination().fullName()
-
-    def destination(self):
-        """the destination attribute of the connection
-
-        :return: the destination attribute
-        :rtype: :class:`cgp_maya_utils.scene.Attribute`
-        """
-
-        # return
-        return self._destination
-
-    def disconnect(self):
-        """disconnect the connection
-        """
-
-        # execute
-        if self.isConnected():
-            maya.cmds.disconnectAttr(self.source(), self.destination())
-
-    def isConnected(self):
-        """check if the connection exists or not
-
-        :return: ``True`` : connection is live - ``False`` : connection is virtual
-        :rtype: bool
-        """
-
-        # return
-        return maya.cmds.isConnected(self.source(), self.destination())
-
-    def setDestination(self, node=None, attribute=None):
-        """set the destination of the connection
-
-        :param node: the new name of the destination node - keep current if None is specified
-        :type node: str
-
-        :param attribute: the new name of the destination attribute - keep current if None is specified
-        :type attribute: str
-        """
-
-        # get infos
-        isConnected = self.isConnected()
-        node = node or self.destination().node()
-        attribute = attribute or self.destination().name()
-
-        # disconnect connection if necessary
-        if isConnected:
-            self.disconnect()
-
-        # set attribute
-        self._destination = cgp_maya_utils.scene._api.attribute('{0}.{1}'.format(node, attribute))
-
-        # connect if necessary
-        if isConnected:
-            self.connect()
-
-    def setSource(self, node=None, attribute=None):
-        """set the source of the connection
-
-        :param node: the new name of the source node - keep current if None is specified
-        :type node: str
-
-        :param attribute: the new name of the source attribute - keep current if None is specified
-        :type attribute: str
-        """
-
-        # get infos
-        isConnected = self.isConnected()
-        node = node or self.source().node()
-        attribute = attribute or self.source().name()
-
-        # disconnect connection
-        self.disconnect()
-
-        # set attribute
-        self._source = cgp_maya_utils.scene._api.attribute('{0}.{1}'.format(node, attribute))
-
-        # connect if necessary
-        if isConnected:
-            self.connect()
-
-    def source(self):
-        """the source attribute of the connection
-
-        :return: the source attribute
-        :rtype: :class:`cgp_maya_utis.scene.Attribute`
-        """
-
-        # return
-        return self._source
 
 
 class Attribute(object):
@@ -263,7 +19,7 @@ class Attribute(object):
 
     # ATTRIBUTES #
 
-    _attributeType = 'attribute'
+    _TYPE = cgp_maya_utils.constants.AttributeType.ATTRIBUTE
 
     # INIT #
 
@@ -274,37 +30,43 @@ class Attribute(object):
         :type fullName: str
         """
 
-        # set fullName
-        self._fullName = fullName
+        # ensure we use long attribute names
+        self._fullName = self._longNameFromFullName(fullName)
 
     def __eq__(self, attribute):
         """check if the Attribute is identical to the other attribute
 
-        :param attribute: attribute to compare to
+        :param attribute: attribute to compare the attribute to
         :type attribute: str or :class:`cgp_maya_utils.scene.Attribute`
 
         :return: ``True`` : attributes are identical - ``False`` : attributes are different
         :rtype: bool
         """
 
+        # init
+        fullName = attribute.fullName() if isinstance(attribute, Attribute) else self._longNameFromFullName(attribute)
+
         # return
-        return self.fullName() == str(attribute)
+        return self.fullName() == fullName
 
     def __ne__(self, attribute):
         """check if the Attribute is different to the other attribute
 
-        :param attribute: attribute to compare to
+        :param attribute: attribute to compare the attribute to
         :type attribute: str or :class:`cgp_maya_utils.scene.Attribute`
 
         :return: ``True`` : attributes are different - ``False`` : attributes are identical
         :rtype: bool
         """
 
+        # init
+        fullName = attribute.fullName() if isinstance(attribute, Attribute) else self._longNameFromFullName(attribute)
+
         # return
-        return self.fullName() != str(attribute)
+        return self.fullName() != fullName
 
     def __repr__(self):
-        """the representation of the attribute
+        """get the representation of the attribute
 
         :return: the representation of the attribute
         :rtype: str
@@ -314,9 +76,9 @@ class Attribute(object):
         return '{0}(\'{1}\')'.format(self.__class__.__name__, self.fullName())
 
     def __str__(self):
-        """the print of the attribute
+        """get the string representation of the attribute
 
-        :return: the print the attribute
+        :return: the string representation the attribute
         :rtype: str
         """
 
@@ -341,8 +103,7 @@ class Attribute(object):
         :param connectionSource: attribute to connect as source - ``node.attribute``
         :type connectionSource: str or :class:`cgp_maya_utils.scene.Attribute`
 
-        :param connectionDestinations: attributes to connect as destination -
-                                       ``[node1.attribute1, node2.attribute2 ...]``
+        :param connectionDestinations: attributes to connect as destination - ``[node1.attrib1, node2.attrib2 ...]``
         :type connectionDestinations: list[str] or list[:class:`cgp_maya_utils.scene.Attribute`]
 
         :return: the created attribute
@@ -351,15 +112,15 @@ class Attribute(object):
 
         # execute
         try:
-            maya.cmds.addAttr(node, longName=name, attributeType=cls._attributeType)
+            maya.cmds.addAttr(node, longName=name, attributeType=cls._TYPE)
         except RuntimeError:
-            maya.cmds.addAttr(node, longName=name, dataType=cls._attributeType)
+            maya.cmds.addAttr(node, longName=name, dataType=cls._TYPE)
 
         # get attribute object
         attrObject = cls('{0}.{1}'.format(node, name))
 
         # set if value specified
-        if value:
+        if value is not None and attrObject.isSettable():
             attrObject.setValue(value)
 
         # connect attribute
@@ -370,8 +131,69 @@ class Attribute(object):
 
     # COMMANDS #
 
+    def animKeys(self, animLayers=None, animLayersIncluded=True):
+        """get the existing animKeys on the attribute
+
+        :param animLayers: the animLayers to get the animKeys from - all if nothing is specified
+        :type animLayers: list[:class:`cgp_maya_utils.scene.AnimLayer`]
+
+        :param animLayersIncluded: ``True`` : the anim layers will be included -
+                                   ``False`` : the anim layers will be excluded
+        :type animLayersIncluded: bool
+
+        :return: the existing animKeys
+        :rtype: list[:class:`cgp_maya_utils.scene.AnimKey`]
+        """
+
+        # init
+        keys = []
+        affectedLayers = self.animLayers()
+
+        # apply anim layers filters
+        if animLayers:
+            if animLayersIncluded:
+                animLayers = [layer for layer in animLayers if layer in affectedLayers]
+            else:
+                animLayers = [layer for layer in affectedLayers if layer not in animLayers]
+        else:
+            animLayers = affectedLayers
+
+        # parse layers
+        for layer in animLayers:
+
+            # bypass non keyed layers
+            if not self.isKeyed(animLayers=[layer]):
+                continue
+
+            # get the correct AnimKey identifier
+            identifier = cgp_maya_utils.scene._api._MISC_TYPES['animKey']._getAnimKeyIdentifier(self, layer)
+
+            # get animation keys on layer
+            for frame in maya.cmds.keyframe(identifier, query=True, timeChange=True) or []:
+                keys.append(cgp_maya_utils.scene._api.animKey(self, frame, layer))
+
+        # return found keys
+        return keys
+
+    def animLayers(self):
+        """get the animLayers associated to the current attribute
+
+        :return: the associated animLayers
+        :rtype: list [:class:`cgp_maya_utils.scene.AbstractAnimLayer`]
+        """
+
+        # query the associated anim layers
+        affectedLayers = maya.cmds.animLayer([self.fullName()], query=True, affectedLayers=True) or []
+
+        # if the attribute is not associated to any layer, it is still associated to the 'None' anim layer
+        if not affectedLayers:
+            return [cgp_maya_utils.scene._api.animLayer(None)]
+
+        # return AnimLayer instances
+        return [cgp_maya_utils.scene._api.animLayer(affectedLayer) for affectedLayer in affectedLayers]
+
     def attributeType(self):
-        """the type of the attribute
+        """get the type of the attribute
 
         :return: the type of the attribute
         :rtype: str
@@ -386,8 +208,7 @@ class Attribute(object):
         :param source: source attribute to connect to the attribute - ``node.attribute`` or ``Attribute``
         :type source: str or :class:`cgp_maya_utils.scene.Attribute`
 
-        :param destinations: destination attributes to connect to the attribute -
-                             ``[node1.attribute1 ...]`` or ``[Attribute1 ...]``
+        :param destinations: destination attributes to connect to the attribute - ``[node1.attribute1 ...]`` or ``[Attribute1 ...]``
         :type destinations: list[str] or list[:class:`cgp_maya_utils.scene.Attribute`]
         """
 
@@ -412,23 +233,31 @@ class Attribute(object):
                 if not isConnected:
                     maya.cmds.connectAttr(self.fullName(), str(destination), force=True)
 
-    def connections(self, nodeTypes=None, source=True, destinations=True, nodeTypesIncluded=True,
+    def connections(self,
+                    nodeTypes=None,
+                    source=True,
+                    destinations=True,
+                    nodeTypesIncluded=True,
                     skipConversionNodes=False):
         """get the connections of the attribute
 
-        :param nodeTypes: types of nodes used to get the connections - All if nothing is specified
+        :param nodeTypes: the types of nodes used to get the connections - All if nothing is specified
         :type nodeTypes: list[str]
 
-        :param source: define whether or not the command will get the source connection
+        :param source: ``True`` : the command will get the source connection -
+                       ``False`` : the command won't get the source connection
         :type source: bool
 
-        :param destinations: define whether or not the command will get the destination connections
+        :param destinations: ``True`` : the command will get the destination connections -
+                             ``False`` : the command won't get the destination connections
         :type destinations: bool
 
-        :param nodeTypesIncluded: ``True`` : include specified node types - ``False`` : exclude specified node types
+        :param nodeTypesIncluded: ``True`` : nodeTypes are included -
+                                  ``False`` : nodeTypes are excluded
         :type nodeTypesIncluded: bool
 
-        :param skipConversionNodes: ``True`` : conversion nodes are skipped - ``False`` conversion nodes are not skipped
+        :param skipConversionNodes: ``True`` : conversion nodes are skipped -
+                                    ``False`` : conversion nodes are not skipped
         :type skipConversionNodes: bool
 
         :return: the connections of the attribute
@@ -436,18 +265,19 @@ class Attribute(object):
         """
 
         # return
-        return Connection.get(self.node(),
-                              attributes=[self.name()],
-                              sources=source,
-                              destinations=destinations,
-                              nodeTypes=nodeTypes,
-                              nodeTypesIncluded=nodeTypesIncluded,
-                              skipConversionNodes=skipConversionNodes)
+        return cgp_maya_utils.scene._api.getConnections(str(self.node()),
+                                                        attributes=[self.name()],
+                                                        sources=source,
+                                                        destinations=destinations,
+                                                        nodeTypes=nodeTypes,
+                                                        nodeTypesIncluded=nodeTypesIncluded,
+                                                        skipConversionNodes=skipConversionNodes)
 
     def data(self, skipConversionNodes=True):
-        """data necessary to store the attribute on disk and/or recreate it from scratch
+        """get the data necessary to store the compound attribute on disk and/or recreate it from scratch
 
-        :param skipConversionNodes: ``True`` : conversion nodes are skipped - ``False`` conversion nodes are not skipped
+        :param skipConversionNodes: ``True`` : conversion nodes are skipped -
+                                    ``False`` : conversion nodes are not skipped
         :type skipConversionNodes: bool
 
         :return: the data of the attribute
@@ -465,11 +295,21 @@ class Attribute(object):
 
         # return
         return {'connectionSource': sourceConnections[0].source().fullName() if sourceConnections else None,
-                'connectionDestinations': [connection.source().fullName() for connection in destinationConnections],
+                'connectionDestinations': [connection.destination().fullName() for connection in destinationConnections],
                 'name': self.name(),
-                'node': self.node().name(),
+                'node': self.node().fullName(),
                 'attributeType': self.attributeType(),
                 'value': self.value()}
+
+    def defaultValue(self):
+        """get the default value of the attribute
+
+        :return: the default value of the attribute
+        :rtype: any
+        """
+
+        # return
+        return maya.cmds.addAttr(self.fullName(), query=True, defaultValue=True)
 
     def delete(self):
         """delete the attribute
@@ -481,10 +321,12 @@ class Attribute(object):
     def disconnect(self, source=True, destinations=True, destinationAttributes=None):
         """disconnect the attribute from the source and the specified destinations
 
-        :param source: defines whether or not the source connected attribute will be disconnected
+        :param source: ``True`` : the connected source attribute will be disconnected -
+                       ``False`` : the connected source attribute won't be disconnected
         :type source: bool
 
-        :param destinations: defines whether or not the destination connected attribute will be disconnected
+        :param destinations: ``True`` : the connected destination attributes will be disconnected -
+                       ``False`` : the connected destination attributes won't be disconnected
         :type destinations: bool
 
         :param destinationAttributes: destination attributes to disconnect from the attribute - All if None is specified
@@ -528,15 +370,126 @@ class Attribute(object):
         # return
         return self._fullName
 
+    def isInternal(self):
+        """check if the attribute is internal - internal attributes may not allow some operations
+
+        :return: ``True`` : attribute is internal - ``False`` : attribute is not internal
+        :rtype: bool
+        """
+
+        # return
+        return maya.cmds.attributeQuery(self.uniqueName(),
+                                        node=self._nodeNameFromFullName(self.fullName()),
+                                        internal=True)
+
+    def isAnimatable(self):
+        """check if the attribute is animatable (ie keyable and displayed in the channelBox)
+
+        :return: ``True`` : the attribute is animatable - ``False`` : the attribute is not animatable
+        :rtype: bool
+        """
+
+        # get animatable attributes
+        animatableAttributes = [attribute.split('|')[-1]
+                                for attribute in maya.cmds.listAnimatable(self.node().fullName()) or []]
+
+        # return
+        return self.fullName() in animatableAttributes
+
+    def isKeyed(self, animLayers=None):
+        """check if the attribute is keyed
+
+        :param animLayers: the animation layers to parse
+        :type animLayers: list[:class:`cgp_maya_utils.scene.AnimLayer`]
+
+        :return: ``True`` : the attribute is keyed - ``False`` : the attribute is not keyed
+        :rtype: bool
+        """
+
+        # init
+        affectedLayers = self.animLayers()
+        animLayers = [layer for layer in animLayers if layer in affectedLayers] if animLayers else affectedLayers
+
+        # for each layers
+        for layer in animLayers:
+            isNoneLayer = layer.isNoneLayer()
+
+            # for the None layer, we check if the key count with the current attribute
+            if isNoneLayer and maya.cmds.keyframe(self, query=True, keyframeCount=True):
+                return True
+
+            # for base/generic layers we check if a curve is associated to the current attribute
+            if not isNoneLayer and maya.cmds.animLayer(layer.name(), query=True, findCurveForPlug=self):
+                return True
+
+        # return False by default
+        return False
+
     def isLocked(self):
         """check if the attribute is locked
 
-        :return: ``True`` : it is locked - ``False`` : it is not locked
+        :return: ``True`` : the attribute is locked - ``False`` : the attribute is not locked
         :rtype: bool
         """
 
         # return
         return maya.cmds.getAttr(self.fullName(), lock=True)
+
+    def isGettable(self):
+        """check if the attribute value is gettable - (an attribute is gettable if it is displayable and readable)
+
+        :return: ``True`` : the attribute is gettable - ``False`` : the attribute is not gettable
+        :rtype: bool
+        """
+
+        # init
+        nodeName = self._nodeNameFromFullName(self.fullName())
+
+        if not self._isDisplayable():
+            return False
+
+        # check if the attribute is readable
+        if not maya.cmds.attributeQuery(self.uniqueName(), node=nodeName, readable=True):
+            return False
+
+        # if none of the above filters have been triggered, the attribute is gettable
+        return True
+
+    def isMulti(self):
+        """check if the attribute is multi (multi attributes have index based children)
+
+        :return: ``True`` : the attribute is a multi - ``False`` : the attribute is not a multi
+        :rtype: bool
+        """
+
+        # return
+        return maya.cmds.attributeQuery(self.uniqueName(), node=self._nodeNameFromFullName(self.fullName()), multi=True)
+
+    def isSettable(self):
+        """check if the attribute value can be set - (an attribute is settable if it is not locked, not connected,
+        writable and not having a non-settable type)
+
+        :return: ``True`` the attribute is settable - ``False`` : the attribute is not settable
+        :rtype: bool
+        """
+
+        # init
+        nodeName = self._nodeNameFromFullName(self.fullName())
+
+        # check if the attribute is locked or connected
+        if not maya.cmds.getAttr(self.fullName(), settable=True):
+            return False
+
+        # check if the attribute is writable
+        if not maya.cmds.attributeQuery(self.uniqueName(), node=nodeName, writable=True):
+            return False
+
+        # check attribute type
+        if self.attributeType() in [None] + cgp_maya_utils.constants.AttributeType.NON_SETTABLES:
+            return False
+
+        # if none of the above filters have been triggered, the attribute is settable
+        return True
 
     def isUserDefined(self):
         """check if the attribute is user defined
@@ -546,10 +499,34 @@ class Attribute(object):
         """
 
         # return
-        return self.name() in maya.cmds.listAttr(self.node(), userDefined=True)
+        return self.name() in (maya.cmds.listAttr(self.node(), userDefined=True) or [])
+
+    def indexes(self):
+        """get the multi indexes of the attribute
+
+        :return: the indexes
+        :rtype: list[int]
+        """
+
+        # non multi attribute don't have indexes
+        if not self.isMulti():
+            return []
+
+        # return
+        return [int(index) for index in maya.cmds.getAttr(self.fullName(), multiIndices=True) or []]
+
+    def MPlug(self):
+        """get the MPlug of the attribute
+
+        :return: the open maya api MPlug
+        :rtype: :class:`maya.api.OpenMaya.MPlug`
+        """
+
+        # return
+        return self.node().MFn().findPlug(self.uniqueName(), True)
 
     def name(self):
-        """the name of the attribute
+        """get the name of the attribute
 
         :return: the name of the attribute
         :rtype: str
@@ -559,19 +536,100 @@ class Attribute(object):
         return self.fullName().partition('.')[-1]
 
     def node(self):
-        """the node on which the attribute lives
+        """get the node of the attribute
 
-        :return: the node of the attribute
+        :return: the node on which the attribute exists
         :rtype: :class:`cgp_maya_utils.scene.Node`
         """
 
         # return
-        return cgp_maya_utils.scene._api.node(self.fullName().split('.')[0])
+        return cgp_maya_utils.scene._api.node(self._nodeNameFromFullName(self.fullName()))
+
+    def parent(self):
+        """get the parent attribute of the attribute
+
+        :return: the parent attribute
+        :rtype: :class:`cgp_maya_utils.scene.Attribute`
+        """
+
+        # init
+        fullName = self.fullName()
+        nodeName = self._nodeNameFromFullName(fullName)
+        attributeName = fullName.rsplit('.', 1)[-1]
+
+        # get parent name
+        if attributeName.count('[') > 1:
+            parentName = attributeName.rsplit('[', 1)[0]
+            parentFullName = '{}.{}'.format(nodeName, parentName)
+        else:
+            parentNames = maya.cmds.attributeQuery(self.uniqueName(), node=nodeName, listParent=True)
+            parentFullName = '{}.{}'.format(nodeName, parentNames[0]) if parentNames else None
+
+        # return
+        return cgp_maya_utils.scene._api.attribute(parentFullName) if parentFullName else None
+
+    def setAnimKey(self,
+                   frame=None,
+                   animLayer=None,
+                   value=None,
+                   inAngle=None,
+                   inTangentType=None,
+                   inWeight=None,
+                   outAngle=None,
+                   outTangentType=None,
+                   outWeight=None):
+        """set an animKey on the attribute
+
+        :param frame: frame of the animKey - default is current frame
+        :type frame: float
+
+        :param animLayer: the animation layer to create the animKey on - default is current animation layer
+        :type animLayer: :class:`cgp_maya_utils.scene.AnimLayer`
+
+        :param value: value of the animKey - key is inserted if nothing is specified
+        :type value: float
+
+        :param inAngle: the in tangent angle
+        :type inAngle: float
+
+        :param inTangentType: type of the inTangent of the animKey
+        :type inTangentType: :class:`cgp_maya_utils.constants.TangentType`
+
+        :param inWeight: the in tangent weight
+        :type inWeight: float
+
+        :param outAngle: the out tangent angle
+        :type outAngle: float
+
+        :param outTangentType: type of the outTangent of the animKey
+        :type outTangentType: :class:`cgp_maya_utils.constants.TangentType`
+
+        :param outWeight: the out tangent weight
+        :param outWeight: float
+
+        :return: the created animKey
+        :rtype: :class:`cgp_maya_utils.scene.AnimKey`
+        """
+
+        # init
+        value = self.value() if value is None else value
+
+        # generate the key
+        return cgp_maya_utils.scene.AnimKey.create(self,
+                                                   frame=frame,
+                                                   animLayer=animLayer,
+                                                   value=value,
+                                                   inAngle=inAngle,
+                                                   inTangentType=inTangentType,
+                                                   inWeight=inWeight,
+                                                   outAngle=outAngle,
+                                                   outTangentType=outTangentType,
+                                                   outWeight=outWeight)
 
     def setLock(self, isLocked):
         """set the lock state of the attribute
 
-        :param isLocked: ``True`` attribute will be locked - ``False`` : attribute will be unlocked
+        :param isLocked: ``True`` : the attribute is locked - ``False`` : the attribute is unlocked
         :type isLocked: bool
         """
 
@@ -594,7 +652,7 @@ class Attribute(object):
     def setValue(self, value):
         """set the value on the attribute
 
-        :param value: value used to set the attribute
+        :param value: value to set on the attribute
         :type value: any
         """
 
@@ -604,12 +662,101 @@ class Attribute(object):
         except RuntimeError:
             maya.cmds.setAttr(self.fullName(), value, type=self.attributeType())
 
+    def uniqueName(self):
+        """get the unique name of the attribute
+
+        note 1: this name is the one expected by `maya.cmds.attributeQuery` to identify the attribute
+        note 2: a TdataCompound attribute may have multiple components using same unique names
+                but in this case they all follow the same definition so the results of `maya.cmds.attributeQuery`
+                will be consistent
+
+        :return: the unique name of the attribute
+        :rtype: str
+        """
+
+        # return
+        return self._uniqueNameFromFullName(self.fullName())
+
     def value(self):
-        """the value of the attribute
+        """get the value of the attribute
 
         :return: the value of the attribute
         :rtype: any
         """
 
+        # non displayable attributes will print this noisy non-blocking error message
+        # "Error: The data is not a numeric or string value, and cannot be displayed."
+        # but they will return `None` anyway so we can speed-up the process by bypassing the maya query
+        return maya.cmds.getAttr(self.fullName()) if self._isDisplayable() else None
+
+    # PROTECTED COMMANDS #
+
+    def _isDisplayable(self):
+        """check if the attribute is displayable - displayable attributes are the attributes
+        that will be accepted by `maya.cmds.getAttr` to query value
+
+        :return: ``True`` : the attribute is displayable - ``False`` : the attribute is not displayable
+        :rtype: bool
+        """
+
+        # get all displayable attribute classes
+        displayables = tuple([cls for name, cls in cgp_maya_utils.scene._api._ATTRIBUTE_TYPES.items()
+                              if name in cgp_maya_utils.constants.AttributeType.DISPLAYABLES])
+
+        # check if current class is in the displayable ones
+        return isinstance(self, displayables)
+
+    @staticmethod
+    def _longNameFromFullName(fullName):
+        """get the long full name of an attribute from its full name
+
+        :param fullName: the full name of the attribute
+        :type fullName: str
+
+        :return: the long full name of the attribute
+        :rtype: str
+        """
+
+        # init
+        nameParts = fullName.split('.')
+
+        # handle nested attributes by querying long name of each name parts
+        for index, namePart in enumerate(nameParts):
+
+            # the first part is the node name, we bypass it
+            if not index:
+                continue
+
+            # get long name
+            nameParts[index] = maya.cmds.attributeName('.'.join(nameParts[:index + 1]), long=True)
+
+        # store the full name
+        return '.'.join(nameParts)
+
+    @staticmethod
+    def _nodeNameFromFullName(fullName):
+        """get the name of the node holding the attribute from the attribute's full name
+
+        :param fullName: the full name of the attribute
+        :type fullName: str
+
+        :return: the name of the node holding the attribute
+        :rtype: str
+        """
+
         # return
-        return maya.cmds.getAttr(self.fullName())
+        return fullName.split('.', 1)[0]
+
+    @staticmethod
+    def _uniqueNameFromFullName(fullName):
+        """get the unique name of the attribute from its full name
+
+        :param fullName: the full name of the attribute
+        :type fullName: str
+
+        :return: the unique name of the attribute
+        :rtype: str
+        """
+
+        # keep only last name part and remove potential index
+        return fullName.rsplit('.', 1)[-1].split('[', 1)[0]

@@ -3,126 +3,400 @@ python objects and management functions to manipulate a variety of entities in a
 such as nodes, attributes, components, namespaces, plugins ...
 """
 
-# imports local
-from ._api import (attribute, connection, createAttribute, getAttributes, getNodesFromAttributes,
-                   currentNamespace, namespace, plugin, scene,
+
+# IMPORTS #
+
+
+from ._api import (_registerAttributeTypes,
+                   _registerComponentTypes,
+                   _registerMiscTypes,
+                   _registerNodeTypes,
+                   _registerOptionVarTypes,
+                   animKey,
+                   animLayer,
+                   attribute,
+                   createAttribute,
+                   createNode,
                    component,
-                   createNode, getNodes, node,
-                   _registerAttributeTypes, _registerComponentTypes, _registerMiscTypes, _registerNodeTypes)
+                   connection,
+                   currentNamespace,
+                   getAnimKeys,
+                   getAnimLayers,
+                   getAttributes,
+                   getConnections,
+                   getNodes,
+                   getNodesFromAttributes,
+                   getOptionVars,
+                   namespace,
+                   node,
+                   optionVar,
+                   plugin,
+                   scene)
 
-from ._misc._misc import Namespace, Plugin, Scene
+# attribute imports
 
-from ._attributes._generic import Attribute, Connection
-from ._attributes._compound import CompoundAttribute, Double3Attribute, Float3Attribute, TDataCompoundAttribute
-from ._attributes._misc import (BoolAttribute, EnumAttribute, MatrixAttribute, MessageAttribute, StringAttribute)
-from ._attributes._numeric import (NumericAttribute, ByteAttribute, DoubleAngleAttribute, DoubleAttribute,
-                                   DoubleLinearAttribute, FloatAttribute, LongAttribute, ShortAttribute, TimeAttribute)
+from ._attributes._generic import Attribute
 
-from ._components._generic import Component, TransformComponent
-from ._components._mesh import Edge, Face, Vertex
-from ._components._nurbCurve import EditPoint, CurvePoint
-from ._components._nurbsSurface import IsoparmU, IsoparmV, SurfacePatch, SurfacePoint
+from ._attributes._array import (DoubleArrayAttribute,
+                                 FloatArrayAttribute,
+                                 Int32ArrayAttribute,
+                                 PointArrayAttribute,
+                                 StringArrayAttribute,
+                                 VectorArrayAttribute)
 
-from ._nodes._animCurve import AnimCurve, AnimCurveTA, AnimCurveTL, AnimCurveTU
-from ._nodes._constraint import (Constraint, AimConstraint, OrientConstraint, ParentConstraint,
-                                 PointConstraint, ScaleConstraint)
-from ._nodes._generic import Node, DagNode, ObjectSet, Reference
-from ._nodes._geometryFilter import GeometryFilter, BlendShape, SkinCluster
-from ._nodes._ik import IkEffector, IkHandle
-from ._nodes._shape import Shape, NurbsCurve, NurbsSurface, Mesh
-from ._nodes._transform import Transform, Joint
+from ._attributes._compound import (CompoundAttribute,
+                                    Double2Attribute,
+                                    Double3Attribute,
+                                    Double4Attribute,
+                                    Float2Attribute,
+                                    Float3Attribute,
+                                    Float4Attribute,
+                                    Long2Attribute,
+                                    Long3Attribute,
+                                    Long4Attribute,
+                                    Short2Attribute,
+                                    Short3Attribute,
+                                    Short4Attribute,
+                                    TdataCompoundAttribute)
+
+from ._attributes._misc import (BoolAttribute,
+                                EnumAttribute,
+                                MatrixAttribute,
+                                MessageAttribute,
+                                StringAttribute)
+
+from ._attributes._numeric import (NumericAttribute,
+                                   ByteAttribute,
+                                   DoubleAngleAttribute,
+                                   DoubleAttribute,
+                                   DoubleLinearAttribute,
+                                   FloatAttribute,
+                                   LongAttribute,
+                                   ShortAttribute,
+                                   TimeAttribute)
+
+# component imports
+
+from ._components._generic import (Component,
+                                   TransformComponent)
+
+from ._components._mesh import (MeshComponent,
+                                Edge,
+                                Face,
+                                UvMap,
+                                Vertex)
+
+from ._components._nurbCurve import (CurvePoint,
+                                     EditPoint)
+
+from ._components._nurbsSurface import (IsoparmU,
+                                        IsoparmV,
+                                        SurfacePatch,
+                                        SurfacePoint)
+
+# misc imports
+
+from ._misc._animKey import AnimKey
+
+from ._misc._animLayer import AnimLayer
+
+from ._misc._connection import Connection
+
+from ._misc._misc import (Namespace,
+                          Plugin,
+                          Scene)
+
+from ._misc._optionVar import (OptionVar,
+                               FloatArrayOptionVar,
+                               FloatOptionVar,
+                               IntArrayOptionVar,
+                               IntOptionVar,
+                               LongArrayOptionVar,
+                               LongOptionVar,
+                               StringArrayOptionVar,
+                               StringOptionVar,
+                               UnicodeArrayOptionVar,
+                               UnicodeOptionVar)
+
+# node imports
+
+from ._nodes._animCurve import (AnimCurve,
+                                AnimCurveTA,
+                                AnimCurveTL,
+                                AnimCurveTU)
+
+from ._nodes._constraint import (Constraint,
+                                 AimConstraint,
+                                 OrientConstraint,
+                                 ParentConstraint,
+                                 PointConstraint,
+                                 ScaleConstraint)
+
+from ._nodes._generic import (Node,
+                              DagNode,
+                              ObjectSet,
+                              Reference)
+
+from ._nodes._geometryFilter import (GeometryFilter,
+                                     BlendShape,
+                                     SoftMod,
+                                     SkinCluster)
+
+from ._nodes._misc import (ComposeMatrix,
+                           DecomposeMatrix,
+                           DisplayLayer,
+                           GpuCache)
+
+from ._nodes._shape import (Shape,
+                            Follicle,
+                            Mesh,
+                            NurbsCurve,
+                            NurbsSurface)
+
+from ._nodes._transform import (Transform,
+                                IkEffector,
+                                IkHandle,
+                                Joint)
 
 
-# register attributes / misc / node / component types
-__attributeTypes = {'compound': CompoundAttribute,
-                    'double3': Double3Attribute,
-                    'float3': Float3Attribute,
-                    'TdataCompound': TDataCompoundAttribute,
-                    'connection': Connection,
-                    'attribute': Attribute,
-                    'bool': BoolAttribute,
-                    'enum': EnumAttribute,
-                    'matrix': MatrixAttribute,
-                    'message': MessageAttribute,
-                    'string': StringAttribute,
-                    'numeric': NumericAttribute,
-                    'byte': ByteAttribute,
-                    'double': DoubleAttribute,
-                    'doubleAngle': DoubleAngleAttribute,
-                    'doubleLinear': DoubleLinearAttribute,
-                    'float': FloatAttribute,
-                    'long': LongAttribute,
-                    'short': ShortAttribute,
-                    'time': TimeAttribute}
+# COLLECT TYPES #
 
-__miscTypes = {'namespace': Namespace,
-               'plugin': Plugin,
-               'scene': Scene}
 
-__nodeTypes = {'node': Node,
-               'dagNode': DagNode,
-               'objectSet': ObjectSet,
-               'reference': Reference,
-               'animCurve': AnimCurve,
-               'animCurveTA': AnimCurveTA,
-               'animCurveTL': AnimCurveTL,
-               'animCurveTU': AnimCurveTU,
-               'constraint': Constraint,
-               'aimConstraint': AimConstraint,
-               'orientConstraint': OrientConstraint,
-               'parentConstraint': ParentConstraint,
-               'pointConstraint': PointConstraint,
-               'scaleConstraint': ScaleConstraint,
-               'geometryFilter': GeometryFilter,
-               'blendShape': BlendShape,
-               'skinCluster': SkinCluster,
-               'ikEffector': IkEffector,
-               'ikHandle': IkHandle,
-               'shape': Shape,
-               'nurbsCurve': NurbsCurve,
-               'nurbsSurface': NurbsSurface,
-               'mesh': Mesh,
-               'transform': Transform,
-               'joint': Joint}
+__attributeTypes = {cls._TYPE: cls
+                    for cls in (Attribute,
+                                DoubleArrayAttribute,
+                                FloatArrayAttribute,
+                                Int32ArrayAttribute,
+                                PointArrayAttribute,
+                                StringArrayAttribute,
+                                VectorArrayAttribute,
+                                CompoundAttribute,
+                                Double2Attribute,
+                                Double3Attribute,
+                                Double4Attribute,
+                                Float2Attribute,
+                                Float3Attribute,
+                                Float4Attribute,
+                                Long2Attribute,
+                                Long3Attribute,
+                                Long4Attribute,
+                                Short2Attribute,
+                                Short3Attribute,
+                                Short4Attribute,
+                                TdataCompoundAttribute,
+                                BoolAttribute,
+                                EnumAttribute,
+                                MatrixAttribute,
+                                MessageAttribute,
+                                StringAttribute,
+                                NumericAttribute,
+                                ByteAttribute,
+                                DoubleAttribute,
+                                DoubleAngleAttribute,
+                                DoubleLinearAttribute,
+                                FloatAttribute,
+                                LongAttribute,
+                                ShortAttribute,
+                                TimeAttribute)}
 
-__componentTypes = {'component': Component,
-                    'transformComponent': TransformComponent,
-                    'e[]': Edge,
-                    'f[]': Face,
-                    'vtx[]': Vertex,
-                    'cv[]': CurvePoint,
-                    'ep[]': EditPoint,
-                    'cv[][]': SurfacePoint,
-                    'u[]': IsoparmU,
-                    'v[]': IsoparmV,
-                    'sf[][]': SurfacePatch}
+__componentTypes = {cls._TYPE: cls
+                    for cls in (Component,
+                                TransformComponent,
+                                Edge,
+                                Face,
+                                UvMap,
+                                Vertex,
+                                CurvePoint,
+                                EditPoint,
+                                SurfacePoint,
+                                IsoparmU,
+                                IsoparmV,
+                                SurfacePatch)}
+
+__miscTypes = {cls._TYPE: cls
+               for cls in (AnimKey,
+                           AnimLayer,
+                           Connection,
+                           Namespace,
+                           Plugin,
+                           Scene)}
+
+__nodeTypes = {cls._TYPE: cls
+               for cls in (AnimCurve,
+                           AnimCurveTA,
+                           AnimCurveTL,
+                           AnimCurveTU,
+                           Constraint,
+                           AimConstraint,
+                           OrientConstraint,
+                           ParentConstraint,
+                           PointConstraint,
+                           ScaleConstraint,
+                           Node,
+                           DagNode,
+                           ObjectSet,
+                           Reference,
+                           GeometryFilter,
+                           BlendShape,
+                           SoftMod,
+                           SkinCluster,
+                           IkEffector,
+                           IkHandle,
+                           ComposeMatrix,
+                           DecomposeMatrix,
+                           DisplayLayer,
+                           Follicle,
+                           GpuCache,
+                           Shape,
+                           NurbsCurve,
+                           NurbsSurface,
+                           Mesh,
+                           Transform,
+                           Joint)}
+
+__optionVarTypes = {cls._TYPE: cls
+                    for cls in (OptionVar,
+                                IntOptionVar,
+                                LongOptionVar,
+                                FloatOptionVar,
+                                StringOptionVar,
+                                UnicodeOptionVar,
+                                IntArrayOptionVar,
+                                LongArrayOptionVar,
+                                FloatArrayOptionVar,
+                                StringArrayOptionVar,
+                                UnicodeArrayOptionVar)}
+
+
+# REGISTER TYPES #
+
 
 _registerAttributeTypes(__attributeTypes)
+_registerComponentTypes(__componentTypes)
 _registerMiscTypes(__miscTypes)
 _registerNodeTypes(__nodeTypes)
-_registerComponentTypes(__componentTypes)
+_registerOptionVarTypes(__optionVarTypes)
 
 
-__all__ = ['attribute', 'connection', 'createAttribute', 'getAttributes', 'getNodesFromAttributes',
-           'createNode', 'getNodes', 'node',
-           'currentNamespace', 'namespace', 'plugin', 'scene',
-           'Namespace', 'Plugin', 'Scene',
-           'Attribute', 'Connection',
-           'Double3Attribute', 'Float3Attribute',
-           'BoolAttribute', 'EnumAttribute', 'MatrixAttribute', 'MessageAttribute', 'StringAttribute',
-           'ByteAttribute', 'DoubleAngleAttribute', 'DoubleAttribute', 'DoubleLinearAttribute',
-           'NumericAttribute', 'FloatAttribute', 'LongAttribute', 'ShortAttribute', 'TimeAttribute',
-           'CompoundAttribute', 'Double3Attribute', 'Float3Attribute', 'TDataCompoundAttribute',
+# DEFINE ALL #
+
+
+__all__ = ['animKey',  # api
+           'animLayer',
+           'attribute',
+           'createAttribute',
+           'createNode',
            'component',
-           'Component', 'TransformComponent',
-           'Edge', 'Face', 'Vertex',
-           'EditPoint', 'CurvePoint',
-           'IsoparmU', 'IsoparmV', 'SurfacePatch', 'SurfacePoint',
-           'AnimCurve', 'AnimCurveTA', 'AnimCurveTL', 'AnimCurveTU',
-           'Constraint', 'AimConstraint', 'OrientConstraint', 'ParentConstraint',
-           'PointConstraint', 'ScaleConstraint',
-           'Node', 'DagNode', 'Reference',
-           'GeometryFilter', 'BlendShape', 'SkinCluster',
-           'IkEffector', 'IkHandle',
-           'Shape', 'NurbsCurve', 'NurbsSurface', 'Mesh',
-           'Transform', 'Joint']
+           'connection',
+           'currentNamespace',
+           'getAnimKeys',
+           'getAnimLayers',
+           'getAttributes',
+           'getConnections',
+           'getNodes',
+           'getNodesFromAttributes',
+           'getOptionVars',
+           'namespace',
+           'node',
+           'optionVar',
+           'plugin',
+           'scene',
+
+           # attributes
+           'Attribute',
+           'BoolAttribute',
+           'ByteAttribute',
+           'NumericAttribute',
+           'CompoundAttribute',
+           'Connection',
+           'Double2Attribute',
+           'Double3Attribute',
+           'Double4Attribute',
+           'DoubleAngleAttribute',
+           'DoubleArrayAttribute',
+           'DoubleAttribute',
+           'DoubleLinearAttribute',
+           'EnumAttribute',
+           'Float2Attribute',
+           'Float3Attribute',
+           'Float4Attribute',
+           'FloatAttribute',
+           'FloatArrayAttribute',
+           'Int32ArrayAttribute',
+           'Long2Attribute',
+           'Long3Attribute',
+           'Long4Attribute',
+           'LongAttribute',
+           'MatrixAttribute',
+           'MessageAttribute',
+           'PointArrayAttribute',
+           'Short2Attribute',
+           'Short3Attribute',
+           'Short4Attribute',
+           'ShortAttribute',
+           'StringArrayAttribute',
+           'StringAttribute',
+           'TdataCompoundAttribute',
+           'TimeAttribute',
+           'VectorArrayAttribute',
+
+           # components
+           'Component',
+           'CurvePoint',
+           'Edge',
+           'EditPoint',
+           'Face',
+           'IsoparmU',
+           'IsoparmV',
+           'MeshComponent',
+           'SurfacePatch',
+           'SurfacePoint',
+           'TransformComponent',
+           'UvMap',
+           'Vertex',
+
+           # nodes
+           'AimConstraint',
+           'AnimCurve',
+           'AnimCurveTA',
+           'AnimCurveTL',
+           'AnimCurveTU',
+           'BlendShape',
+           'ComposeMatrix',
+           'Constraint',
+           'DagNode',
+           'DecomposeMatrix',
+           'DisplayLayer',
+           'Follicle',
+           'GeometryFilter',
+           'GpuCache',
+           'IkEffector',
+           'IkHandle',
+           'Joint',
+           'Mesh',
+           'Node',
+           'NurbsCurve',
+           'NurbsSurface',
+           'ObjectSet',
+           'OrientConstraint',
+           'ParentConstraint',
+           'PointConstraint',
+           'Reference',
+           'ScaleConstraint',
+           'Shape',
+           'SoftMod',
+           'SkinCluster',
+           'Transform',
+
+           # optionVars
+           'FloatArrayOptionVar',
+           'FloatOptionVar',
+           'IntArrayOptionVar',
+           'IntOptionVar',
+           'LongArrayOptionVar',
+           'LongOptionVar',
+           'OptionVar',
+           'StringArrayOptionVar',
+           'StringOptionVar',
+           'UnicodeArrayOptionVar',
+           'UnicodeOptionVar']

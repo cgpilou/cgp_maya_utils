@@ -27,22 +27,38 @@ class MayaObject(maya.api.OpenMaya.MObject):
         """
 
         # init
-        self._node = node
+        self._node = str(node)
 
         # get selection list
-        selection_list = maya.api.OpenMaya.MSelectionList()
-        selection_list.add(str(node))
+        selectionList = maya.api.OpenMaya.MSelectionList()
+
+        # try to add to selection
+        try:
+            selectionList.add(self._node)
+
+        # errors
+        except RuntimeError:
+
+            # validate given value
+            instances = maya.cmds.ls(self._node)
+
+            # raise exception
+            if not instances:
+                raise ValueError("No node named '{0}' in scene".format(self._node))
+
+            elif len(instances) > 1:
+                raise ValueError("More than one node named '{0}' in scene".format(self._node))
 
         # get mObject
-        mObject = selection_list.getDependNode(0)
+        mObject = selectionList.getDependNode(0)
 
         # init
         super(MayaObject, self).__init__(mObject)
 
     def __repr__(self):
-        """the representation of the maya object
+        """get the representation of the MayaObject
 
-        :return: the representation of the maya object
+        :return: the representation of the MayaObject
         :rtype: str
         """
 
@@ -75,7 +91,7 @@ class TransformationMatrix(maya.api.OpenMaya.MTransformationMatrix):
         :type shear: list[int, float]
 
         :param rotateOrder: value of rotateOrder of the transformationMatrix
-        :type rotateOrder: :str
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
 
         :return: the transformation matrix
         :rtype: :class:`cgp_maya_utils.api.TransformationMatrix`
@@ -124,7 +140,7 @@ class TransformationMatrix(maya.api.OpenMaya.MTransformationMatrix):
             self.setShear(shear, maya.api.OpenMaya.MSpace.kWorld)
 
     def __repr__(self):
-        """the representation of the TransformationMatrix
+        """get the representation of the TransformationMatrix
 
         :return: the representation of the TransformationMatrix
         :rtype: str
@@ -164,7 +180,7 @@ class TransformationMatrix(maya.api.OpenMaya.MTransformationMatrix):
         :type attribute: str or :class:`cgp_maya_utils.scene.Attribute`
 
         :param rotateOrder: rotateOrder of the transformationMatrix to get - use transform one if nothing specified
-        :type rotateOrder: str
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
 
         :return: the transformationMatrix
         :rtype: :class:`cgp_maya_utils.api.TransformationMatrix`
@@ -188,7 +204,7 @@ class TransformationMatrix(maya.api.OpenMaya.MTransformationMatrix):
         :type matrix: list[int, float] or :class:`maya.api.OpenMaya.MMatrix`
 
         :param rotateOrder: rotateOrder of the transformationMatrix to get
-        :type rotateOrder: str
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
 
         :return: the transformationMatrix
         :rtype: :class:`cgp_maya_utils.api.TransformationMatrix`
@@ -217,7 +233,7 @@ class TransformationMatrix(maya.api.OpenMaya.MTransformationMatrix):
         :type shear: list[int, float]
 
         :param rotateOrder: rotateOrder of the transformationMatrix to get
-        :type rotateOrder: str
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
 
         :return: the transformationMatrix
         :rtype: :class:`cgp_maya_utils.api.TransformationMatrix`
@@ -229,10 +245,10 @@ class TransformationMatrix(maya.api.OpenMaya.MTransformationMatrix):
     # COMMANDS #
 
     def rotateOrder(self):
-        """the rotateOrder of the transformationMatrix
+        """get the rotateOrder of the transformationMatrix
 
-        :return: the rotateOrder
-        :rtype: str
+        :return: the rotateOrder of the transformationMatrix
+        :rtype: :class:`cgp_maya_utils.constants.RotateOrder`
         """
 
         # return
@@ -242,7 +258,7 @@ class TransformationMatrix(maya.api.OpenMaya.MTransformationMatrix):
         """set the rotateOrder of the transformationMatrix
 
         :param rotateOrder: new rotateOrder of the transformationMatrix
-        :type rotateOrder: str
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
         """
 
         # errors
@@ -255,7 +271,7 @@ class TransformationMatrix(maya.api.OpenMaya.MTransformationMatrix):
         self.reorderRotation(mRotateOrder)
 
     def transformValues(self):
-        """the transform values stored in the transformation matrix
+        """get the transform values stored in the transformation matrix
 
         :return: the transform values of the transformation matrix
         :rtype: dict

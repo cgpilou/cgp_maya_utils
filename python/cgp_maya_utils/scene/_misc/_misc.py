@@ -3,15 +3,20 @@ miscellaneous object library
 """
 
 # imports third-parties
+import maya.api.OpenMaya
+import maya.api.OpenMayaAnim
 import maya.cmds
 import maya.mel
+import PySide2.QtCore
 import PySide2.QtWidgets
+
+# imports rodeo
 import cgp_generic_utils.files
 import cgp_generic_utils.constants
 
 # imports local
+import cgp_maya_utils.constants
 import cgp_maya_utils.scene._api
-import cgp_maya_utils.decorators
 
 
 # MISC OBJECTS #
@@ -20,6 +25,10 @@ import cgp_maya_utils.decorators
 class Namespace(object):
     """namespace object that manipulates a namespace
     """
+
+    # ATTRIBUTES #
+
+    _TYPE = cgp_maya_utils.constants.MiscType.NAMESPACE
 
     # INIT #
 
@@ -49,12 +58,12 @@ class Namespace(object):
                           else '{0}:{1}'.format(currentNamespace, namespace))
 
     def __eq__(self, namespace):
-        """check if the Namespace has the same name as the other namespace
+        """check if the Namespace is identical to the other namespace
 
-        :param namespace: namespace to check the name with
-        :type namespace: Namespace / str
+        :param namespace: namespace to compare to the namespace to
+        :type namespace: str or :class:`cgp_maya_utils.scene.Namespace`
 
-        :return: True if the names are identical, False otherwise
+        :return: ``True`` : the namespaces are identical - ``False`` : the namespaces are different
         :rtype: bool
         """
 
@@ -62,12 +71,12 @@ class Namespace(object):
         return self.fullName() == str(namespace)
 
     def __ne__(self, namespace):
-        """check if the Namespace has not the same name as the other namespace
+        """check if the Namespace is different to the other namespace
 
-        :param namespace: namespace to check the name with
-        :type namespace: Namespace / str
+        :param namespace: namespace to compare to the namespace to
+        :type namespace: str or :class:`cgp_maya_utils.scene.Namespace`
 
-        :return: True if the names are different, False otherwise
+        :return: ``True`` : the namespaces are different - ``False`` : the namespaces are identical
         :rtype: bool
         """
 
@@ -82,17 +91,17 @@ class Namespace(object):
         """
 
         # return
-        return 'Namespace(\'{0}\')'.format(self.fullName())
+        return 'Namespace({0!r})'.format(self.fullName())
 
     def __str__(self):
-        """get the print of the namespace
+        """get the string representation of the namespace
 
-        :return: the print of the namespace
+        :return: the string representation of the namespace
         :rtype: str
         """
 
         # return
-        return self.fullName(asAbsolute=True)
+        return self.fullName()
 
     # OBJECT COMMANDS #
 
@@ -116,7 +125,7 @@ class Namespace(object):
     # COMMANDS #
 
     def fullName(self, asAbsolute=True):
-        """the full name of the namespace
+        """get the full name of the namespace
 
         :param asAbsolute: ``True`` : full name is returned asAbsolute - ``False`` full name is returned as relative
         :type asAbsolute: bool
@@ -126,9 +135,7 @@ class Namespace(object):
         """
 
         # return
-        return (maya.cmds.namespaceInfo(self._fullName, absoluteName=True)
-                if asAbsolute
-                else maya.cmds.namespaceInfo(self._fullName, fullName=True))
+        return maya.cmds.namespaceInfo(self._fullName, absoluteName=asAbsolute)
 
     def isCurrent(self):
         """check is the namespace is the current namespace
@@ -138,7 +145,7 @@ class Namespace(object):
         return self.fullName(asAbsolute=True) == cgp_maya_utils.scene._api.currentNamespace(asAbsolute=True)
 
     def name(self):
-        """the name of the namespace
+        """get the name of the namespace
 
         :return: the name of the namespace
         :rtype: str
@@ -148,7 +155,7 @@ class Namespace(object):
         return maya.cmds.namespaceInfo(self._fullName, shortName=True)
 
     def parent(self):
-        """the parent namespace of the namespace
+        """get the parent of the namespace
         """
 
         # get parent namespace
@@ -168,6 +175,10 @@ class Namespace(object):
 class Plugin(object):
     """plugin object that manipulates a maya plugin
     """
+
+    # ATTRIBUTES #
+
+    _TYPE = cgp_maya_utils.constants.MiscType.PLUGIN
 
     # INIT #
 
@@ -189,14 +200,24 @@ class Plugin(object):
         """
 
         # return
-        return '{0}(\'{1}\')'.format(self.__class__.__name__, self.name())
+        return '{0}({1!r})'.format(self.__class__.__name__, self.name())
 
     # COMMANDS #
+
+    def file_(self):
+        """get the file of the plugin
+
+        :return: the file of the plugin
+        :rtype: :class:`cgp_generic_utils.file.File`
+        """
+
+        # return
+        return cgp_generic_utils.files.entity(str(self.path()))
 
     def isAutoLoaded(self):
         """check if the plugin is autoLoaded
 
-        :return: ``True`` : it is autoLoaded  - ``False`` : it is not autoLoaded
+        :return: ``True`` : the plugin is autoLoaded  - ``False`` : the plugin is not autoLoaded
         :rtype: bool
         """
 
@@ -206,7 +227,7 @@ class Plugin(object):
     def isLoaded(self):
         """check if the plugin is loaded
 
-        :return: ``True`` : it is loaded  - ``False`` : it is not loaded
+        :return: ``True`` : the plugin is loaded  - ``False`` : the plugin is not loaded
         :rtype: bool
         """
 
@@ -214,18 +235,20 @@ class Plugin(object):
         return maya.cmds.pluginInfo(self.name(), query=True, loaded=True)
 
     def load(self):
-        """load the plugin if it is not already loaded
+        """load the plugin
         """
 
         # execute
         try:
             if not maya.cmds.pluginInfo(self.name(), query=True, loaded=True):
                 maya.cmds.loadPlugin(self.name())
+
+        # error
         except RuntimeError:
             maya.cmds.warning('{0} is not a registered plugin'.format(self.name()))
 
     def name(self):
-        """the name of the plugin
+        """get the name of the plugin
 
         :return: the name of the plugin
         :rtype: str
@@ -235,22 +258,22 @@ class Plugin(object):
         return self._name
 
     def path(self):
-        """the path of the plugin file
+        """get the path of the plugin
 
-        :return: the path of the plugin file
-        :rtype: :class:`cgp_generic_utils.files.File`
+        :return: the path of the plugin
+        :rtype: :class:`cgp_generic_utils.file.Path`
         """
 
         # get plugin path
         path = maya.cmds.pluginInfo(self.name(), query=True, path=True)
 
         # return
-        return cgp_generic_utils.files.entity(path)
+        return cgp_generic_utils.files.Path(path)
 
     def unload(self, deleteNodes=False):
         """unload the plugin
 
-        :param deleteNodes: ``True`` : plugin nodes are deleted before unload - ``False`` nodes are not deleted
+        :param deleteNodes: `True`` : plugin nodes are deleted before unload - ``False`` nodes are not deleted
         :type deleteNodes: bool
         """
 
@@ -258,23 +281,36 @@ class Plugin(object):
         maya.cmds.flushUndo()
 
         # unload plugin
-        unloadedPlugin = maya.cmds.unloadPlugin(self.name)
+        unloadedPlugin = maya.cmds.unloadPlugin(self.name())
 
         # delete node if specified
         if deleteNodes and unloadedPlugin:
-            maya.cmds.delete(maya.cmds.ls(type=self.name))
+            maya.cmds.delete(maya.cmds.ls(type=self.name()))
+
+    def version(self):
+        """get the version of the plugin
+
+        :return: the version of the plugin
+        :rtype: str
+        """
+
+        return maya.cmds.pluginInfo(self.name(), query=True, version=True)
 
 
 class Scene(object):
     """scene object that manipulates a live scene
     """
 
+    # ATTRIBUTES #
+
+    _TYPE = cgp_maya_utils.constants.MiscType.SCENE
+
     # INIT #
 
     def __repr__(self):
-        """the representation of the scene object
+        """get the representation of the scene
 
-        :return: the representation of the scene object
+        :return: the representation of the scene
         :rtype: str
         """
 
@@ -285,7 +321,7 @@ class Scene(object):
 
     @staticmethod
     def animationStart():
-        """the start of the animation
+        """get the start of the animation
 
         :return: the start of the animation
         :rtype: float
@@ -296,7 +332,7 @@ class Scene(object):
 
     @staticmethod
     def animationEnd():
-        """the end of the animation
+        """get the end of the animation
 
         :return: the end of the animation
         :rtype: float
@@ -307,28 +343,28 @@ class Scene(object):
 
     @staticmethod
     def currentTime():
-        """the current time of the animation
+        """get the current time of the animation
 
         :return: the current time of the animation
         :rtype: float
         """
 
-        # return
-        return maya.cmds.currentTime(query=True)
+        # return with OpenMaya (faster than maya.cmds)
+        return maya.api.OpenMayaAnim.MAnimControl.currentTime().value
 
     @staticmethod
     def file_():
         """get the file of the scene
 
-        :return: the file of the scene
-        :rtype: :class:`cgp_generic_utils.files.File`
+        :return: the current scene file
+        :rtype: :class:`cgp_maya_utils.files.MayaFile`
         """
 
-        # get the path
-        path = maya.cmds.file(query=True, sceneName=True) or None
+        # get file path
+        filePath = maya.cmds.file(query=True, sceneName=True)
 
         # return
-        return cgp_generic_utils.files.entity(path) if path else None
+        return cgp_generic_utils.files.entity(filePath) if filePath else None
 
     @staticmethod
     def mainWindow():
@@ -338,17 +374,27 @@ class Scene(object):
         :rtype: :class:`PySide2.QtWidgets.QMainWindow`
         """
 
+        # deprecation warning
+        maya.cmds.warning('mainWindow() command from cgp_maya_utils.scene._misc._misc.Scene is deprecated '
+                          'use cgp_maya_utils.qt.application().mainWindow() instead.')
+
         # get maya application
         mayaApplication = PySide2.QtWidgets.QApplication.instance()
 
-        # return
+        # parse top level widgets until we find the maya main window
         for widget in mayaApplication.topLevelWidgets():
-            if widget.objectName() == 'MayaWindow':
+
+            # QApplication.topLevelWidgets() also lists non QObject objects such as QListWidgetItem
+            if not isinstance(widget, PySide2.QtCore.QObject):
+                continue
+
+            # if the object name match, we found the correct widget
+            if widget.objectName() == cgp_maya_utils.constants.Interface.MAYA_WINDOW:
                 return widget
 
     @staticmethod
     def maximumTime():
-        """the maximum time of the animation
+        """get the maximum time of the animation
 
         :return: the maximum time of the animation
         :rtype: float
@@ -359,7 +405,7 @@ class Scene(object):
 
     @staticmethod
     def minimumTime():
-        """the minimum time of the animation
+        """get the minimum time of the animation
 
         :return: the minimum time of the animation
         :rtype: float
@@ -383,7 +429,7 @@ class Scene(object):
     def setAnimationStart(value):
         """set the start of the animation
 
-        :param value: value used to set the animationStart
+        :param value: value to set as start of animation
         :type value: float or int
         """
 
@@ -394,7 +440,7 @@ class Scene(object):
     def setAnimationEnd(value):
         """set the end of the animation
 
-        :param value: value used to set the animationEnd
+        :param value: value to set as end of animation
         :type value: float or int
         """
 
@@ -403,20 +449,23 @@ class Scene(object):
 
     @staticmethod
     def setCurrentTime(value):
-        """set the currentTime of the animation
+        """set the current time of the animation
 
-        :param value: value used to set the currentTime
+        :param value: value used to set the current time
         :type value: float or int
         """
 
-        # execute
+        # we may have faster results using maya.api.OpenMayaAnim.MAnimControl.setCurrentTime
+        # but since the cache playback option has been implemented in Maya, this command makes Maya freeze
+        # we may disable the cache playback option in a decorator
+        # but in order to keep the code simple, we prefer slower but more reliable maya.cmds command
         maya.cmds.currentTime(value)
 
     @staticmethod
     def setMaximumTime(value):
-        """set the maximumTime of the animation
+        """set the maximum time of the animation
 
-        :param value: value used to set the maximumTime
+        :param value: value used to set the maximum time
         :type value: float or int
         """
 
@@ -425,9 +474,9 @@ class Scene(object):
 
     @staticmethod
     def setMinimumTime(value):
-        """set the minimumTime of the animation
+        """set the minimum time of the animation
 
-        :param value: value used to set the minimumTime
+        :param value: value used to set the minimum time
         :type value: float or int
         """
 
@@ -435,12 +484,48 @@ class Scene(object):
         maya.cmds.playbackOptions(minTime=value)
 
     @staticmethod
+    def timeIncrement():
+        """get the time increment of the animation
+
+        :return: the time increment of the animation
+        :rtype: float
+        """
+
+        # return
+        return maya.cmds.playbackOptions(query=True, by=True)
+
+    @staticmethod
+    def timeline():
+        """get the QWidget of Maya's timeline
+
+        :return: QWidget of Maya's timeline
+        :rtype: :class:`PySide2.QtWidgets.QWidget`
+        """
+
+        # deprecation warning
+        maya.cmds.warning('timeline() command from cgp_maya_utils.scene._misc._misc.Scene is deprecated '
+                          'use cgp_maya_utils.qt.application().timeline() instead.')
+
+        # get timeline name
+        timelineName = maya.mel.eval('$tmpVar=$gPlayBackSlider').rsplit('|')[-1]
+
+        # get widgets
+        widgets = {widget.objectName(): widget for widget in PySide2.QtWidgets.QApplication.allWidgets()}
+
+        # return
+        return widgets.get(timelineName)
+
+    @staticmethod
     def viewport():
-        """the viewport of the scene
+        """get the viewport of the scene
 
         :return: the viewport of the scene
         :rtype: str
         """
+
+        # deprecation warning
+        maya.cmds.warning('viewport() command from cgp_maya_utils.scene._misc._misc.Scene is deprecated '
+                          'use cgp_maya_utils.qt.application().mainViewport().objectName() instead.')
 
         # return
         return str(maya.mel.eval('global string $gMainPane; $temp = $gMainPane;'))

@@ -2,8 +2,8 @@
 miscellaneous attribute object library
 """
 
-
 # imports python
+import re
 import ast
 
 # imports third-parties
@@ -24,14 +24,14 @@ class BoolAttribute(_generic.Attribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.BOOLEAN
+    _TYPE = cgp_maya_utils.constants.AttributeType.BOOLEAN
 
     # COMMANDS #
 
     def setValue(self, value):
         """set the value on the attribute
 
-        :param value: value to set on the boolean attribute
+        :param value: value to set on the attribute
         :type value: bool or int
         """
 
@@ -48,12 +48,12 @@ class EnumAttribute(_generic.Attribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.ENUM
+    _TYPE = cgp_maya_utils.constants.AttributeType.ENUM
 
     # OBJECT COMMANDS #
 
     @classmethod
-    def create(cls, node, name, items=None, value=None, connections=None, **__):
+    def create(cls, node, name, items=None, value=None, connectionSource=None, connectionDestinations=None, **__):
         """create an enum attribute
 
         :param node: node on which to create the attribute
@@ -68,16 +68,18 @@ class EnumAttribute(_generic.Attribute):
         :param value: value to set on the attribute
         :type value: int or str
 
-        :param connections: connection to build on the attribute -
-                            ``{'source': node.attribute, 'destinations': [node.attribute ...]}``
-        :type connections: dict
+        :param connectionSource: attribute to connect as source - ``node.attribute``
+        :type connectionSource: str or :class:`cgp_maya_utils.scene.Attribute`
+
+        :param connectionDestinations: attributes to connect as destination - ``[node1.attrib1, node2.attrib2 ...]``
+        :type connectionDestinations: list[str] or list[:class:`cgp_maya_utils.scene.Attribute`]
 
         :return: the created attribute
         :rtype: :class:`cgp_maya_utils.scene.EnumAttribute`
         """
 
         # execute
-        maya.cmds.addAttr(node, longName=name, attributeType=cls._attributeType, enumName=':'.join(items or []))
+        maya.cmds.addAttr(node, longName=name, attributeType=cls._TYPE, enumName=':'.join(items or []))
 
         # get attribute object
         attrObject = cls('{0}.{1}'.format(node, name))
@@ -86,9 +88,8 @@ class EnumAttribute(_generic.Attribute):
         if value:
             attrObject.setValue(value)
 
-        # connect attribute if specified
-        if connections:
-            attrObject.connect(source=connections['source'], destinations=connections['destinations'])
+        # connect attribute
+        attrObject.connect(source=connectionSource, destinations=connectionDestinations)
 
         # return
         return attrObject
@@ -96,12 +97,12 @@ class EnumAttribute(_generic.Attribute):
     # COMMANDS #
 
     def data(self, skipConversionNodes=True):
-        """data necessary to store the enum attribute on disk and/or recreate it from scratch
+        """get the data necessary to store the enum attribute on disk and/or recreate it from scratch
 
         :param skipConversionNodes: ``True`` : conversion nodes are skipped - ``False`` conversion nodes are not skipped
         :type skipConversionNodes: bool
 
-        :return: the data of the enum attribute
+        :return: the data of the attribute
         :rtype: dict
         """
 
@@ -115,43 +116,147 @@ class EnumAttribute(_generic.Attribute):
         return data
 
     def items(self):
-        """get the items of the enum attribute
+        """get the items of the attribute
 
-        :return: the items of the enum attribute
+        :return: the items of the attribute
         :rtype: list[str]
         """
 
+        # get the string formatted item list
+        itemsAsString = maya.cmds.attributeQuery(self.uniqueName(),
+                                                 node=self._nodeNameFromFullName(self.fullName()),
+                                                 listEnum=True)
+
+        # use a regex to ensure item names containing ':' won't be interpreted as separated items
+        # ':' is the matches delimiter except if it is followed by a space
+        regex = r"( ?: |[^:])+"
+
         # return
-        return maya.cmds.attributeQuery(self.name(), node=self.node().name(), listEnum=True)[0].split(':')
+        return [match.group() for match in re.finditer(regex, itemsAsString[0])] if itemsAsString else []
 
-    def setValue(self, value):
-        """set the value on the enum attribute
+    def itemIndex(self, value):
+        """get the item index from the given value
 
-        :param value: value to set on the enum attribute
-        :type value: float or str
+        Note: By default the enum use default 0 based indices. But Maya allow to override an index.
+              In this case the item string will look like `myValue=7` where `7` is the index.
+              But the `maya.cmds.getAttr(self.fullName(), asString=True)` will only return `myValue`
+
+        :param value: the value of the enum item to get the index from
+        :type value: str
+
+        :return: the index of the item holding the value
+        :rtype: int
         """
 
-        # data is int
-        if isinstance(value, int):
+        # init
+        index = 0
+
+        # get the index
+        for item in self.items():
+
+            # get item value and new index
+            itemValue, newIndex = item.split("=") if item.count("=") == 1 else (item, index)
+
+            # get index
+            index = int(newIndex) if isinstance(newIndex, basestring) and newIndex.isdigit() else index
+
+            # return
+            if value == itemValue:
+                return index
+
+            # increment index
+            index += 1
+
+        # raise an error if the given value is not in the enum items
+        raise ValueError("Value '{}' not in {}".format(value, repr(self.fullName())))
+
+    def setAnimKey(self,
+                   frame=None,
+                   animLayer=None,
+                   value=None,
+                   inAngle=None,
+                   inTangentType=None,
+                   inWeight=None,
+                   outAngle=None,
+                   outTangentType=None,
+                   outWeight=None):
+        """set an animKey on the attribute
+
+        :param frame: frame of the animKey - default is current frame
+        :type frame: float
+
+        :param animLayer: the animation layer to create the animKey on - default is current animation layer
+        :type animLayer: :class:`cgp_maya_utils.scene.AnimLayer`
+
+        :param value: value of the animKey - key is inserted if nothing is specified
+        :type value: float
+
+        :param inAngle: the in tangent angle
+        :type inAngle: float
+
+        :param inTangentType: type of the inTangent of the animKey
+        :type inTangentType: :class:`cgp_maya_utils.constants.TangentType`
+
+        :param inWeight: the in tangent weight of the animKey
+        :type inWeight: float
+
+        :param outAngle: the out tangent angle of the animKey
+        :type outAngle: float
+
+        :param outTangentType: type of the outTangent of the animKey
+        :type outTangentType: :class:`cgp_maya_utils.constants.TangentType`
+
+        :param outWeight: the out tangent weight of the animKey
+        :param outWeight: float
+
+        :return: the created animKey
+        :rtype: :class:`cgp_maya_utils.scene.AnimKey`
+        """
+
+        # get value
+        if value is None:
+            value = self.value(asString=False)
+
+        elif isinstance(value, basestring):
+            value = self.items().index(value)
+
+        # return
+        return super(EnumAttribute, self).setAnimKey(frame=frame,
+                                                     animLayer=animLayer,
+                                                     value=value,
+                                                     inAngle=inAngle,
+                                                     inTangentType=inTangentType,
+                                                     inWeight=inWeight,
+                                                     outAngle=outAngle,
+                                                     outTangentType=outTangentType,
+                                                     outWeight=outWeight)
+
+    def setValue(self, value):
+        """set the value on the attribute
+
+        :param value: value to set on the attribute
+        :type value: int or float or str
+        """
+
+        # data is int - warning: float is accepted but will be truncated
+        if isinstance(value, (int, float)):
             maya.cmds.setAttr(self.fullName(), value)
 
-        # data is str
+        # data is str - warning: first match will be selected for enum containing multiple items using the same str
         elif isinstance(value, basestring):
-            enumValues = maya.cmds.attributeQuery(self.name(), node=self.node().name(), listEnum=True)
-            enumValues = enumValues[0].split(':')
-            maya.cmds.setAttr(self.fullName(), enumValues.index(value))
+            maya.cmds.setAttr(self.fullName(), self.itemIndex(value))
 
         # errors
         else:
-            raise ValueError('{0} {1} is not a valid data - expecting --> str or int'.format(value, type(value)))
+            raise ValueError('{0} {1} is not a valid data - expecting --> str or int '.format(value, type(value)))
 
     def value(self, asString=True):
-        """the value of the enum attribute
+        """get the value of the attribute
 
         :param asString: ``True`` : value is returned as a string - ``False`` : value is returned as an integer
         :type asString: bool
 
-        :return: the value of the enum attribute
+        :return: the value of the attribute
         :rtype: int or str
         """
 
@@ -165,14 +270,14 @@ class MatrixAttribute(_generic.Attribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.MATRIX
+    _TYPE = cgp_maya_utils.constants.AttributeType.MATRIX
 
     # COMMANDS #
 
     def setValue(self, value):
-        """set the value on the matrix attribute
+        """set the value on the attribute
 
-        :param value: value to set on the matrix attribute
+        :param value: value to set on the attribute
         :type value: list[int, float]
         """
 
@@ -185,10 +290,10 @@ class MatrixAttribute(_generic.Attribute):
             self.disconnect(source=True, destinations=False)
 
     def transformationMatrix(self, rotateOrder=None):
-        """the transformationMatrix related to the MMatrix stored in the matrix attribute
+        """get the transformationMatrix related to the MMatrix stored in the matrix attribute
 
         :param rotateOrder: rotateOrder of the transformationMatrix to get - use transform one if nothing specified
-        :type rotateOrder: str
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
 
         :return: the transformationMatrix
         :rtype: :class:`cgp_maya_utils.api.TransformationMatrix`
@@ -204,14 +309,14 @@ class MessageAttribute(_generic.Attribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.MESSAGE
+    _TYPE = cgp_maya_utils.constants.AttributeType.MESSAGE
 
     # COMMANDS #
 
     def setValue(self, value):
-        """set the value on the message attribute
+        """set the value on the attribute
 
-        :param value: value to set on the message attribute
+        :param value: value to set on the attribute
         :type value: str or :class:`cgp_maya_utils.scene.Attribute`
         """
 
@@ -222,9 +327,9 @@ class MessageAttribute(_generic.Attribute):
             self.disconnect(source=True, destinations=False)
 
     def value(self):
-        """the value of the message attribute
+        """get the value of the attribute
 
-        :return: the value of the message attribute
+        :return: the value of the attribute
         :rtype: str
         """
 
@@ -241,14 +346,14 @@ class StringAttribute(_generic.Attribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.STRING
+    _TYPE = cgp_maya_utils.constants.AttributeType.STRING
 
     # COMMANDS #
 
     def eval(self):
         """eval the content of the string attribute
 
-        :return: the eval content
+        :return: the evaluated content
         :rtype: literal
         """
 
@@ -258,7 +363,7 @@ class StringAttribute(_generic.Attribute):
     def setValue(self, value):
         """set the value on the attribute
 
-        :param value: value used to set the attribute
+        :param value: value to set on the attribute
         :type value: str
         """
 
