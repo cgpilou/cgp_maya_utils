@@ -1,7 +1,9 @@
 """
-numeric attribute object library
-"""
+package : cgp_maya_utils.scene._attribute
+file : _numeric.py
 
+description: handles numeric attribute operations
+"""
 
 # imports third-parties
 import maya.cmds
@@ -20,7 +22,7 @@ class NumericAttribute(_generic.Attribute):
 
     # ATTRIBUTES #
 
-    _attributeType = 'numeric'
+    _TYPE = cgp_maya_utils.constants.AttributeType.NUMERIC
 
     # INIT #
 
@@ -40,7 +42,7 @@ class NumericAttribute(_generic.Attribute):
     def __lt__(self, value):
         """override lt operator
 
-        :param value:value to compare to the numeric attribute
+        :param value: value to compare to the numeric attribute
         :type value: numeric
 
         :return: ``True`` : attribute is less than the value - ``False`` attribute is greater than or equal to the value
@@ -88,6 +90,68 @@ class NumericAttribute(_generic.Attribute):
         # execute
         self.setValue(self.value() + value)
 
+    def divide(self, value):
+        """divide the numeric attribute by the value
+
+        :param value: value to divide to the numeric attribute
+        :type value: int or float
+        """
+
+        # execute
+        self.multiply(1 / value)
+
+    def maximumValue(self):
+        """get the maximum value of the attribute
+
+        :return: the maximum value of the attribute
+        :rtype: int or float
+        """
+
+        # init
+        nodeName = self._nodeName()
+        attributeName = self.uniqueName()
+
+        # return
+        return (maya.cmds.attributeQuery(attributeName, node=nodeName, maximum=True)
+                if maya.cmds.attributeQuery(attributeName, node=nodeName, maxExists=True)
+                else None)
+
+    def minimumValue(self):
+        """get the minimum value of the attribute
+
+        :return: the minimum value of the attribute
+        :rtype: int or float
+        """
+
+        # init
+        nodeName = self._nodeName()
+        attributeName = self.uniqueName()
+
+        # return
+        return (maya.cmds.attributeQuery(attributeName, node=nodeName, minimum=True)
+                if maya.cmds.attributeQuery(attributeName, node=nodeName, minExists=True)
+                else None)
+
+    def multiply(self, value):
+        """multiply the numeric attribute by the value
+
+        :param value: value to multiply to the numeric attribute
+        :type value: int or float
+        """
+
+        # execute
+        self.setValue(self.value() * value)
+
+    def power(self, value):
+        """power the numeric attribute by the value
+
+        :param value: value to power the numeric attribute by
+        :type value: int or float
+        """
+
+        # execute
+        self.setValue(pow(self.value(), value))
+
     def setValue(self, value):
         """set the value on the numeric attribute
 
@@ -101,42 +165,12 @@ class NumericAttribute(_generic.Attribute):
     def substract(self, value):
         """substract the value to the numeric attribute
 
-        :param value: value to substract to the numeric
+        :param value: value to substract to the numeric attribute
         :type value: int or float
         """
 
         # execute
         self.add(-value)
-
-    def multiply(self, value):
-        """multiply the numeric attribute by the value
-
-        :param value: value to multiply to the numeric attribute
-        :type value: int or float
-        """
-
-        # execute
-        self.setValue(self.value() * value)
-
-    def divide(self, value):
-        """divide the numeric attribute by the value
-
-        :param value: value to divide to the numeric attribute
-        :type value: int or float
-        """
-
-        # execute
-        self.multiply(1 / value)
-
-    def power(self, value):
-        """power the numeric attribute by the value
-
-        :param value: value to power the numeric attribute by
-        :type value: int or float
-        """
-
-        # execute
-        self.setValue(pow(self.value(), value))
 
 
 # NUMERIC OBJECTS #
@@ -148,7 +182,7 @@ class ByteAttribute(NumericAttribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.BYTE
+    _TYPE = cgp_maya_utils.constants.AttributeType.BYTE
 
 
 class DoubleAttribute(NumericAttribute):
@@ -157,7 +191,8 @@ class DoubleAttribute(NumericAttribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.DOUBLE
+    _MPLUG_VALUE_GETTER = 'asDouble'
+    _TYPE = cgp_maya_utils.constants.AttributeType.DOUBLE
 
 
 class DoubleAngleAttribute(NumericAttribute):
@@ -166,7 +201,7 @@ class DoubleAngleAttribute(NumericAttribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.DOUBLE_ANGLE
+    _TYPE = cgp_maya_utils.constants.AttributeType.DOUBLE_ANGLE
 
 
 class DoubleLinearAttribute(NumericAttribute):
@@ -175,7 +210,7 @@ class DoubleLinearAttribute(NumericAttribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.DOUBLE_LINEAR
+    _TYPE = cgp_maya_utils.constants.AttributeType.DOUBLE_LINEAR
 
 
 class FloatAttribute(NumericAttribute):
@@ -184,7 +219,8 @@ class FloatAttribute(NumericAttribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.FLOAT
+    _MPLUG_VALUE_GETTER = 'asFloat'
+    _TYPE = cgp_maya_utils.constants.AttributeType.FLOAT
 
 
 class LongAttribute(NumericAttribute):
@@ -193,7 +229,8 @@ class LongAttribute(NumericAttribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.LONG
+    _MPLUG_VALUE_GETTER = 'asInt'
+    _TYPE = cgp_maya_utils.constants.AttributeType.LONG
 
 
 class ShortAttribute(NumericAttribute):
@@ -202,7 +239,8 @@ class ShortAttribute(NumericAttribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.SHORT
+    _MPLUG_VALUE_GETTER = 'asShort'
+    _TYPE = cgp_maya_utils.constants.AttributeType.SHORT
 
 
 class TimeAttribute(NumericAttribute):
@@ -211,4 +249,4 @@ class TimeAttribute(NumericAttribute):
 
     # ATTRIBUTES #
 
-    _attributeType = cgp_maya_utils.constants.AttributeType.TIME
+    _TYPE = cgp_maya_utils.constants.AttributeType.TIME

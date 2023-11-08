@@ -2,6 +2,9 @@
 transform object library
 """
 
+# imports python
+import os
+
 # imports third-parties
 import maya.cmds
 import maya.api.OpenMaya
@@ -24,41 +27,52 @@ class Transform(_generic.DagNode):
 
     # ATTRIBUTES #
 
-    _nodeType = 'transform'
-    _MFn = maya.api.OpenMaya.MFnTransform()
+    _MFN = maya.api.OpenMaya.MFnTransform()
+    _TYPE = cgp_maya_utils.constants.NodeType.TRANSFORM
 
     # OBJECT COMMANDS #
 
     @classmethod
-    def create(cls, translate=None, rotate=None, scale=None, rotateOrder=None, parent=None,
-               worldSpace=False, connections=None, attributeValues=None, name=None, **__):
+    def create(cls,
+               translate=None,
+               rotate=None,
+               scale=None,
+               rotateOrder=None,
+               parent=None,
+               worldSpace=False,
+               connections=None,
+               attributeValues=None,
+               name=None,
+               **__):
         """create a transform
 
-        :param translate: translation values of the transform
+        :param translate: the translation values of the transform
         :type translate: list[int, float]
 
-        :param rotate: rotation values  of the transform
+        :param rotate: the rotation values of the transform
         :type rotate: list[int, float]
 
-        :param scale: scale values of the transform
+        :param scale: the scale values of the transform
         :type scale: list[int, float]
 
-        :param rotateOrder: rotateOrder of the transform - default is ``cgp_maya_utils.constants.rotateOrder.XYZ``
-        :type rotateOrder: str
+        :param rotateOrder: the rotateOrder of the transform -
+                            default is ``cgp_maya_utils.constants.rotateOrder.XYZ``
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
 
-        :param parent: parent of the transform
+        :param parent: the parent of the transform
         :type parent: str or :class:`cgp_maya_utils.scene.DagNode`
 
-        :param worldSpace: ``True`` : transform values are worldSpace - ``False`` : transform values are local
+        :param worldSpace: ``True`` : the transform values are in worldSpace -
+                           ``False`` : the transform values are in local
         :type worldSpace: bool
 
-        :param connections: connections to set on the transform
+        :param connections: the connections to set on the transform
         :type connections: list[tuple[str]]
 
-        :param attributeValues: attribute values to set on the transform
+        :param attributeValues: the attribute values to set on the transform
         :type attributeValues: dict
 
-        :param name: name of the transform
+        :param name: the name of the transform
         :type name: str
 
         :return: the created transform
@@ -77,7 +91,7 @@ class Transform(_generic.DagNode):
         sx, sy, sz = scale or [1, 1, 1]
 
         # create the transform
-        xformObject = cls(maya.cmds.createNode(cls._nodeType))
+        xformObject = cls(maya.cmds.createNode(cls._TYPE))
         xformObject.setParent(parent)
 
         # set rotateOrder
@@ -87,16 +101,20 @@ class Transform(_generic.DagNode):
         xformObject.translate(x=tx, y=ty, z=tz,
                               worldSpace=worldSpace,
                               mode=cgp_generic_utils.constants.TransformMode.ABSOLUTE)
-        
+
         xformObject.rotate(x=rx, y=ry, z=rz,
                            worldSpace=worldSpace,
                            mode=cgp_generic_utils.constants.TransformMode.ABSOLUTE)
-        
+
         xformObject.scale(x=sx, y=sy, z=sz,
                           mode=cgp_generic_utils.constants.TransformMode.ABSOLUTE)
 
         # set data
         if attributeValues:
+            attributeValues.pop("translate", None)
+            attributeValues.pop("rotate", None)
+            attributeValues.pop("scale", None)
+            attributeValues.pop("rotateOrder", None)
             xformObject.setAttributeValues(attributeValues)
         if connections:
             xformObject.setConnections(connections)
@@ -109,12 +127,13 @@ class Transform(_generic.DagNode):
     # COMMANDS #
 
     def constraints(self, constraintTypes=None, sources=True, destinations=True, constraintTypesIncluded=True):
-        """the source constraints driving the node and the destination constraints the node drives
+        """get the source constraints driving the node and the destination constraints the node drives
 
-        :param constraintTypes: types of constraints to get - All if nothing is specified
+        :param constraintTypes: types of constraints to get -
+                                default is ``cgp_maya_utils.constants.NodeType.CONSTRAINTS``
         :type constraintTypes: list[str]
 
-        :param sources: ``True`` : source constraints are returned  - ``False`` : source constraints are skipped
+        :param sources: ``True`` : the source constraints are returned  - ``False`` : the source constraints are skipped
         :type sources: bool
 
         :param destinations: ``True`` : destination constraints returned -
@@ -126,12 +145,7 @@ class Transform(_generic.DagNode):
         :type constraintTypesIncluded: bool
 
         :return: the constraints
-        :rtype: list[:class:`cgp_maya_utils.scene.Constraint`,
-                     :class:`cgp_maya_utils.scene.AimConstraint`,
-                     :class:`cgp_maya_utils.scene.OrientConstraint`,
-                     :class:`cgp_maya_utils.scene.ParentConstraint`,
-                     :class:`cgp_maya_utils.scene.PointConstraint`,
-                     :class:`cgp_maya_utils.scene.ScaleConstraint`]
+        :rtype: list[Constraint]
         """
 
         # init
@@ -156,33 +170,71 @@ class Transform(_generic.DagNode):
             cstrTypes = set(cgp_maya_utils.constants.NodeType.CONSTRAINTS) - set(constraintTypes)
 
         # execute
+        fullName = self.fullName()
         for cstrType in cstrTypes:
 
-            # get constraints
-            constraints = set(maya.cmds.listConnections(self.name(),
-                                                        source=sources,
-                                                        destination=destinations,
-                                                        type=cstrType) or [])
+            # sources
+            if sources:
 
-            # update data
-            for constraint in constraints:
+                # get source constraints
+                if not cstrType == cgp_maya_utils.constants.NodeType.FKN_SPACE_SWITCH:
+                    sourceConstraints = maya.cmds.listConnections(fullName,
+                                                                  source=True,
+                                                                  destination=False,
+                                                                  type=cstrType) or []
 
-                # get constraint object
-                constraintObject = cgp_maya_utils.scene._api.node(constraint)
+                else:
 
-                # update
-                if (constraintObject.driven() and self == constraintObject.driven() and sources
-                        or constraintObject.drivers() and self in constraintObject.drivers() and destinations):
-                    data.append(constraintObject)
+                    sourceConstraints = []
+
+                    convertToLocalSpaces = maya.cmds.listConnections(fullName,
+                                                                     source=True,
+                                                                     destination=False,
+                                                                     type='fkn_ConvertToLocalSpace') or []
+
+                    for ctlsNode in set(convertToLocalSpaces):
+                        sourceConstraints += maya.cmds.listConnections(ctlsNode,
+                                                                       source=True,
+                                                                       destination=False,
+                                                                       type='fkn_SpaceSwitchCns') or []
+
+                # update inputs
+                for sourceConstraint in set(sourceConstraints):
+
+                    # get object
+                    cstrObject = cgp_maya_utils.scene._api.node(sourceConstraint)
+
+                    # update
+                    if cstrObject.driven() and self == cstrObject.driven():
+                        data.append(cstrObject)
+
+            # # destinations
+            if destinations:
+
+                # get destination constraints
+                destinationConstraints = sorted(list(set(maya.cmds.listConnections(fullName,
+                                                                                   source=False,
+                                                                                   destination=True,
+                                                                                   type=cstrType) or [])))
+
+                # update inputs
+                for destinationConstraint in destinationConstraints:
+
+                    # get object
+                    cstrObject = cgp_maya_utils.scene._api.node(destinationConstraint)
+
+                    # update
+                    if cstrObject.drivers() and self in cstrObject.drivers():
+                        data.append(cstrObject)
 
         # return
         return data
 
     def data(self, worldSpace=False):
-        """data necessary to store the transform node on disk and/or recreate it from scratch
+        """get the data necessary to store the transform node on disk and/or recreate it from scratch
 
-        :param worldSpace: ``True`` : transform values are worldSpace -
-                           ``False`` : transform values are local
+        :param worldSpace: ``True`` : the transform values are queried in worldSpace -
+                           ``False`` : the transform values are queried in local
         :type worldSpace: bool
 
         :return: the data of the transform
@@ -202,10 +254,10 @@ class Transform(_generic.DagNode):
         return data
 
     def duplicate(self, withChildren=True):
-        """duplicate the transform node
+        """duplicate the transform
 
-        :param withChildren: ``True`` : transform node is duplicated with its children -
-                             ``False`` : transform node is not duplicated with its children
+        :param withChildren: ``True`` : the transform is duplicated with its children -
+                             ``False`` : the transform is not duplicated with its children
         :type withChildren: bool
 
         :return: the duplicated transform
@@ -213,26 +265,30 @@ class Transform(_generic.DagNode):
         """
 
         # return
-        return cgp_maya_utils.scene.node(maya.cmds.duplicate(str(self), parentOnly=not withChildren)[0])
+        return self.__class__(maya.cmds.duplicate(str(self), parentOnly=not withChildren)[0])
 
     def freeze(self, translate=True, rotate=True, scale=True, normal=False):
         """freeze the values of the transform
 
-        :param translate: ``True`` : translation values are frozen - ``False`` : translation values are not frozen
+        :param translate: ``True`` : the translation values are frozen -
+                          ``False`` : the translation values are not frozen
         :type translate: bool
 
-        :param rotate: ``True`` : rotation values are frozen - ``False`` : rotation values are not frozen
+        :param rotate: ``True`` : the rotation values are frozen -
+                       ``False`` : the rotation values are not frozen
         :type rotate: bool
 
-        :param scale: ``True`` : scale values are frozen - ``False`` : scale values are not frozen
+        :param scale: ``True`` : the scale values are frozen -
+                      ``False`` : the scale values are not frozen
         :type scale: bool
 
-        :param normal: ``True`` : normal values are frozen - ``False`` : normal values are not frozen
+        :param normal: ``True`` : the normal values are frozen -
+                       ``False`` : the normal values are not frozen
         :type normal: bool
         """
 
         # execute
-        maya.cmds.makeIdentity(self.name(),
+        maya.cmds.makeIdentity(self.fullName(),
                                apply=True,
                                translate=translate,
                                rotate=rotate,
@@ -240,26 +296,25 @@ class Transform(_generic.DagNode):
                                preserveNormals=not normal,
                                normal=normal)
 
-    def match(self, targetTransform, attributes=None, worldSpace=True):
+    def match(self, target, attributes=None, worldSpace=True):
         """match the transform to the target transform
 
-        :param targetTransform: transform to match to
-        :type targetTransform: str or :class:`cgp_maya_utils.scene.Transform`
+        :param target: the transform to match to
+        :type target: str or :class:`cgp_maya_utils.scene.Transform`
 
         :param attributes: attributes to match - default is ``cgp_maya_utils.constants.Transform.GENERAL``
-        :type attributes: list[str]
+        :type attributes: list[:class:`cgp_maya_utils.constants.Transform`]
 
-        :param worldSpace: ``True`` : match occurs in worldSpace - ``False`` : match occurs in local
+        :param worldSpace: ``True`` : the match occurs in worldSpace - ``False`` : the match occurs in local
         :type worldSpace: bool
         """
 
         # init
         attributes = self._formatAttributes(attributes)
-        targetTransform = targetTransform if isinstance(targetTransform, Transform) else Transform(targetTransform)
+        target = target if isinstance(target, Transform) else Transform(target)
 
         # get target xforms values
-        values = targetTransform.transformValues(worldSpace=worldSpace,
-                                                 rotateOrder=self.attribute('rotateOrder').value())
+        values = target.transformValues(worldSpace=worldSpace, rotateOrder=self.attribute('rotateOrder').value())
 
         # snap
         self._setTransformValues(values, attributes=attributes, worldSpace=worldSpace)
@@ -267,17 +322,18 @@ class Transform(_generic.DagNode):
     def mirror(self, mirrorPlane=None, attributes=None, worldSpace=False, mode=None):
         """mirror the transform
 
-        :param mirrorPlane: plane of mirroring - default is ``cgp_generic_utils.constants.MirrorPlane.YZ``
-        :type mirrorPlane: str
+        :param mirrorPlane: the plane of mirroring - default is ``cgp_maya_utils.constants.MirrorPlane.YZ``
+        :type mirrorPlane: :class:`cgp_generic_utils.constants.MirrorPlane`
 
-        :param attributes: transform attributes to mirror - default is ``cgp_maya_utils.constants.Transform.GENERAL``
-        :type attributes: list
+        :param attributes: the transform attributes to mirror -
+                           default is ``cgp_maya_utils.constants.Transform.GENERAL``
+        :type attributes: list[:class:`cgp_maya_utils.constants.Transform`]
 
-        :param worldSpace: ``True`` : mirror occurs in worldSpace - ``False`` : mirror occurs in local
+        :param worldSpace: ``True`` : the mirror occurs in worldSpace - ``False`` : the mirror occurs in local
         :type worldSpace: bool
 
-        :param mode: mode of mirroring - default is ``cgp_generic_utils.constants.MirrorMode.MIRROR``
-        :type mode: str
+        :param mode: the mode of mirroring - default is ``cgp_maya_utils.constants.MirrorMode.MIRROR``
+        :type mode: :class:`cgp_generic_utils.constants.MirrorMode`
         """
 
         # init
@@ -302,22 +358,22 @@ class Transform(_generic.DagNode):
         # execute
         self._setTransformValues(mirrorValues, attributes=attributes, worldSpace=worldSpace)
 
-    @cgp_maya_utils.decorators.KeepCurrentSelection()
+    @cgp_maya_utils.decorators.KeepSelection()
     def mirrorTransformValues(self, mirrorPlane=None, worldSpace=False, rotateOrder=None, mode=None):
         """the mirror transform values
 
-        :param mirrorPlane: plane of mirroring - default is ``cgp_generic_utils.constants.MirrorPlane.YZ``
-        :type mirrorPlane: str
+        :param mirrorPlane: the plane of mirroring - default is ``cgp_generic_utils.constants.MirrorPlane.YZ``
+        :type mirrorPlane: :class:`cgp_generic_utils.constants.MirrorPlane`
 
-        :param worldSpace: ``True`` : mirror transform values are worldSpace -
-                           ``False`` : mirror transform values are local
+        :param worldSpace: ``True`` : the mirror transform values are queried in worldSpace -
+                           ``False`` : the mirror transform values are queried in local
         :type worldSpace: bool
 
-        :param rotateOrder: rotateOrder to get the mirror transform values in - ! ONLY IN WORLDSPACE !
-        :type rotateOrder: str
+        :param rotateOrder: the rotateOrder to get the mirror transform values in
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
 
-        :param mode: mode of mirroring - default is ``cgp_generic_utils.constants.MirrorMode.MIRROR``
-        :type mode: str
+        :param mode: the mode of mirroring - default is ``cgp_maya_utils.constants.MirrorMode.MIRROR``
+        :type mode: :class:`cgp_maya_utils.constants.MirrorMode`
 
         :return: the mirrored transforms
         :rtype: dict
@@ -339,56 +395,80 @@ class Transform(_generic.DagNode):
         if mode not in cgp_generic_utils.constants.MirrorMode.ALL:
             raise ValueError('{0} is not a valid mode - {1}'.format(mode, cgp_generic_utils.constants.MirrorMode.ALL))
 
-        # create temporary locator
-        tempOrig = maya.cmds.group(empty=True)
-        tempLoc = Transform(maya.cmds.spaceLocator()[0])
+        # get transformation matrix
+        transformationMatrix = self.transformationMatrix(worldSpace=worldSpace, rotateOrder=rotateOrder)
 
-        # snap tempLoc to position # TODO: make it works with matrix calculation instead of locator
-        maya.cmds.parent(tempLoc.name(), tempOrig)
-        maya.cmds.delete(maya.cmds.parentConstraint(self.name(), tempLoc.name()))
-        maya.cmds.delete(maya.cmds.scaleConstraint(self.name(), tempLoc.name()))
+        # get rotation and translation
+        rotation = transformationMatrix.rotation()
+        translation = transformationMatrix.translation(maya.api.OpenMaya.MSpace.kWorld)
 
-        # parent locator if necessary
-        if not worldSpace and self.parent():
-            tempLoc.setParent(self.parent().name())
+        # get MMatrix
+        mMatrix = transformationMatrix.asMatrix()
+
+        # get mirror plane index
+        mirrorPlaneIndex = cgp_generic_utils.constants.Axe.ALL.index(cgp_generic_utils.constants.AxisTable.ALL[mirrorPlane])
 
         # mirror translation
         if mode in [cgp_generic_utils.constants.MirrorMode.NO_MIRROR, cgp_generic_utils.constants.MirrorMode.MIRROR]:
-            attr = '{0}.t{1}'.format(tempLoc.name(), cgp_generic_utils.constants.AxisTable.ALL[mirrorPlane])
-            cgp_maya_utils.scene._api.attribute(attr).multiply(-1)
+
+            # multiply corresponding axis by -1
+            translation[mirrorPlaneIndex] *= -1
+
+            # set translation
+            transformationMatrix.setTranslation(translation, maya.api.OpenMaya.MSpace.kWorld)
+
+            # get resulting MMatrix
+            mMatrix = transformationMatrix.asMatrix()
 
         # mirror rotation
         if mode == cgp_generic_utils.constants.MirrorMode.MIRROR:
+
+            # execute
             for axis in mirrorPlane:
-                attr = '{0}.r{1}'.format(tempLoc.name(), axis)
-                cgp_maya_utils.scene._api.attribute(attr).multiply(-1)
+
+                # get mirror plane index
+                axisIndex = cgp_generic_utils.constants.Axe.ALL.index(axis)
+
+                # multiply each corresponding axis by -1
+                rotation[axisIndex] *= -1
+
+            # set rotation
+            transformationMatrix.setRotation(rotation)
+
+            # get resulting MMatrix
+            mMatrix = transformationMatrix.asMatrix()
 
         # neg mirror
         if mode == cgp_generic_utils.constants.MirrorMode.NEG_MIRROR:
-            maya.cmds.setAttr('{0}.s{1}'.format(tempOrig, cgp_generic_utils.constants.AxisTable.ALL[mirrorPlane]), -1)
 
-        # get mirror transform values
-        values = tempLoc.transformValues(worldSpace=worldSpace, rotateOrder=rotateOrder)
+            # init
+            identityMatrix = maya.api.OpenMaya.MMatrix()
 
-        # delete temporaries joints
-        maya.cmds.delete([tempOrig, tempLoc.name()])
+            # multiply the corresponding axis by -1
+            identityMatrix[mirrorPlaneIndex * 5] *= -1
+
+            # get resulting MMatrix
+            mMatrix = mMatrix * identityMatrix
+
+        # get transformationMatrix
+        transformationMatrix = cgp_maya_utils.api.TransformationMatrix.fromMatrix(mMatrix, rotateOrder=rotateOrder)
 
         # return
-        return values
+        return transformationMatrix.transformValues()
 
     def reset(self, translate=True, rotate=True, scale=True, shear=True):
         """reset the values of the transform to its default values
 
-        :param translate: ``True`` : translation values are reset - ``False`` : translation values are not reset
+        :param translate: ``True`` : the translation values are reset - ``False`` : the translation values are not reset
         :type translate: bool
 
-        :param rotate: ``True`` : rotation values are reset - ``False`` : rotation values are not reset
+        :param rotate: ``True`` : the rotation values are reset - ``False`` : the rotation values are not reset
         :type rotate: bool
 
-        :param scale: ``True`` : scale values are reset - ``False`` : scale values are not reset
+        :param scale: ``True`` : the scale values are reset - ``False`` : the scale values are not reset
         :type scale: bool
 
-        :param shear: ``True`` : shear values are reset - ``False`` : shear values are not reset
+        :param shear: ``True`` : the shear values are reset - ``False`` : the shear values are not reset
         :type shear: bool
         """
 
@@ -417,7 +497,7 @@ class Transform(_generic.DagNode):
             return
 
         # execute
-        maya.cmds.xform(self.name(), **data)
+        maya.cmds.xform(self.fullName(), **data)
 
     def rotate(self, x=None, y=None, z=None, worldSpace=False, mode=None):
         """rotate the transform
@@ -431,15 +511,15 @@ class Transform(_generic.DagNode):
         :param z: value of rotateZ to set
         :type z: float
 
-        :param worldSpace: ``True`` : rotate occurs in worldSpace - ``False`` : rotate occurs in local
+        :param worldSpace: ``True`` : the rotation occurs in worldSpace - ``False`` : the rotation occurs in local
         :type worldSpace: bool
 
         :param mode: ``cgp_generic_utils.constants.TransformMode.ABSOLUTE`` : value is replaced, default mode -
                      ``cgp_generic_utils.constants.TransformMode.RELATIVE`` : value is added
-        :type mode: str
+        :type mode: :class:`cgp_generic_utils.constants.TransformMode`
         """
 
-        # get infos
+        # get info
         values = self.transformationMatrix(worldSpace=worldSpace).transformValues()
         isRelative = mode == cgp_generic_utils.constants.TransformMode.RELATIVE
 
@@ -449,12 +529,12 @@ class Transform(_generic.DagNode):
             y = y if y is not None else 0
             z = z if z is not None else 0
         else:
-            x = x if x is not None else values[cgp_maya_utils.constants.Transform.ROTATE_X]
-            y = y if y is not None else values[cgp_maya_utils.constants.Transform.ROTATE_Y]
-            z = z if z is not None else values[cgp_maya_utils.constants.Transform.ROTATE_Z]
+            x = x if x is not None else values[cgp_maya_utils.constants.Transform.ROTATE][0]
+            y = y if y is not None else values[cgp_maya_utils.constants.Transform.ROTATE][1]
+            z = z if z is not None else values[cgp_maya_utils.constants.Transform.ROTATE][2]
 
         # set values
-        maya.cmds.xform(self.name(), worldSpace=worldSpace, relative=isRelative, rotation=[x, y, z])
+        maya.cmds.xform(self.fullName(), worldSpace=worldSpace, relative=isRelative, rotation=[x, y, z])
 
     def scale(self, x=None, y=None, z=None, mode=None):
         """scale the transform
@@ -470,10 +550,10 @@ class Transform(_generic.DagNode):
 
         :param mode: ``cgp_generic_utils.constants.TransformMode.ABSOLUTE`` : value is replaced, default mode -
                      ``cgp_generic_utils.constants.TransformMode.RELATIVE`` : value is added
-        :type mode: str
+        :type mode: :class:`cgp_generic_utils.constants.TransformMode`
         """
 
-        # get infos
+        # get info
         values = self.transformationMatrix().transformValues()
         isRelative = mode == cgp_generic_utils.constants.TransformMode.RELATIVE
 
@@ -483,12 +563,26 @@ class Transform(_generic.DagNode):
             y = y if y is not None else 1
             z = z if z is not None else 1
         else:
-            x = x if x is not None else values[cgp_maya_utils.constants.Transform.SCALE_X]
-            y = y if y is not None else values[cgp_maya_utils.constants.Transform.SCALE_Y]
-            z = z if z is not None else values[cgp_maya_utils.constants.Transform.SCALE_Z]
+            x = x if x is not None else values[cgp_maya_utils.constants.Transform.SCALE][0]
+            y = y if y is not None else values[cgp_maya_utils.constants.Transform.SCALE][1]
+            z = z if z is not None else values[cgp_maya_utils.constants.Transform.SCALE][2]
 
         # set values
-        maya.cmds.xform(self.name(), relative=isRelative, scale=[x, y, z])
+        maya.cmds.xform(self.fullName(), relative=isRelative, scale=[x, y, z])
+
+    def setTransformValues(self, transformValues, worldSpace=False):
+        """set the transform values
+
+        :param transformValues: the transform values to set
+        :type transformValues: dict
+
+        :param worldSpace: ``True`` : the transform values are in worldSpace -
+                           ``False`` : the transform values are in local
+        :type worldSpace: bool
+        """
+
+        # execute
+        self._setTransformValues(transformValues, worldSpace=worldSpace)
 
     def shear(self, xy=None, xz=None, yz=None, mode=None):
         """shear the transform
@@ -504,10 +598,10 @@ class Transform(_generic.DagNode):
 
         :param mode: ``cgp_generic_utils.constants.TransformMode.ABSOLUTE`` : value is replaced, default mode -
                      ``cgp_generic_utils.constants.TransformMode.RELATIVE`` : value is added
-        :type mode: str
+        :type mode: :class:`cgp_generic_utils.constants.TransformMode`
         """
 
-        # get infos
+        # get info
         values = self.transformationMatrix().transformValues()
         isRelative = mode == cgp_generic_utils.constants.TransformMode.RELATIVE
 
@@ -517,44 +611,32 @@ class Transform(_generic.DagNode):
             xz = xz if xz is not None else 0
             yz = yz if yz is not None else 0
         else:
-            xy = xy if xy is not None else values[cgp_maya_utils.constants.Transform.SHEAR_XY]
-            xz = xz if xz is not None else values[cgp_maya_utils.constants.Transform.SHEAR_XZ]
-            yz = yz if yz is not None else values[cgp_maya_utils.constants.Transform.SHEAR_YZ]
+            xy = xy if xy is not None else values[cgp_maya_utils.constants.Transform.SHEAR][0]
+            xz = xz if xz is not None else values[cgp_maya_utils.constants.Transform.SHEAR][1]
+            yz = yz if yz is not None else values[cgp_maya_utils.constants.Transform.SHEAR][2]
 
         # set values
-        maya.cmds.xform(self.name(), relative=isRelative, shear=[xy, xz, yz])
+        maya.cmds.xform(self.fullName(), relative=isRelative, shear=[xy, xz, yz])
 
-    def setTransformValues(self, transformValues, worldSpace=False):
-        """set transform values
+    def shapes(self, shapeTypes=None, shapeTypesIncluded=True, isSorted=False):
+        """get the shapes from the Transform
 
-        :param transformValues: transform values to set
-        :type transformValues: dict
-
-        :param worldSpace: ``True`` : values are set in worldSpace - ``False`` : values are set in local
-        :type worldSpace: bool
-        """
-
-        # execute
-        self._setTransformValues(transformValues, worldSpace=worldSpace)
-
-    def shapes(self, shapeTypes=None, shapeTypesIncluded=True):
-        """the shapes parented under the transform
-
-        :param shapeTypes: types of shape to get - All if nothing is specified
+        :param shapeTypes: types used to get the shapes - All if nothing is specified
         :type shapeTypes: list[str]
 
-        :param shapeTypesIncluded: ``True`` : shape types are included - ``False`` : shape types are excluded
+        :param shapeTypesIncluded: ``True`` : the shapeTypes are included - ``False`` : the shapeTypes are excluded
         :type shapeTypesIncluded: bool
 
+        :param isSorted: ``True`` : shapes are sorted and returned in the upstream order -
+                         ``False`` : shapes are returned in no specific order`
+        :type isSorted: bool
+
         :return: the shapes of the transform
-        :rtype: list[:class:`cgp_maya_utils.scene.Shape`,
-                     :class:`cgp_maya_utils.scene.NurbsCurve`,
-                     :class:`cgp_maya_utils.scene.NurbsSurface`,
-                     :class:`cgp_maya_utils.scene.Mesh`,]
+        :rtype: list[Shape]
         """
 
         # init
-        returnShapes = []
+        shapes = []
         queryShapeTypes = []
 
         # errors
@@ -574,16 +656,46 @@ class Transform(_generic.DagNode):
         elif shapeTypes and not shapeTypesIncluded:
             queryShapeTypes = set(cgp_maya_utils.constants.NodeType.SHAPES) - set(shapeTypes)
 
-        # execute
+        # collect shapes
         for shapeType in queryShapeTypes:
-            for shape in maya.cmds.listRelatives(self.name(), shapes=True, type=shapeType) or []:
-                returnShapes.append(cgp_maya_utils.scene.node(shape))
+            shapeFullNames = maya.cmds.listRelatives(self.fullName(),
+                                                     shapes=True,
+                                                     type=shapeType,
+                                                     fullPath=True,
+                                                     noIntermediate=isSorted) or []
+            for shapeFullName in shapeFullNames:
+                shapes.append(cgp_maya_utils.scene.node(shapeFullName))
 
-        # return
-        return returnShapes
+        # return unsorted
+        if not isSorted:
+            return shapes
+
+        # sort shapes by outMesh connections
+        shapes = sorted(shapes,
+                        key=lambda shape_: len(shape_.attribute('outMesh').connections(source=False,
+                                                                                       destinations=True)))
+
+        # sort shapes following upstream
+        sortedShapes = []
+        for shape in shapes:
+
+            # bypass if the shape has already been listed via upstreams
+            if shape in sortedShapes:
+                continue
+
+            # append non intermediate shape
+            sortedShapes.append(shape)
+
+            # append upstream shapes
+            for upstreamShape in shape.upstream(nodeTypes=cgp_maya_utils.constants.NodeType.SHAPES):
+                if upstreamShape not in sortedShapes:
+                    sortedShapes.append(upstreamShape)
+
+        # return sorted - first is visible shape, last is original shape
+        return sortedShapes
 
     def transformationMatrix(self, worldSpace=False, rotateOrder=None):
-        """the transformationMatrix of the transform
+        """get the transformationMatrix of the transform
 
         :param worldSpace: ``True`` : TransformationMatrix is initialized with the worldSpace transform values -
                            ``False`` : TransformationMatrix is initialized with the local transform values
@@ -591,10 +703,10 @@ class Transform(_generic.DagNode):
 
         :param rotateOrder: rotateOrder to get the transform values in -
                             default is the current rotateOrder of the transform
-        :type rotateOrder: str
+        :type rotateOrder: :class:`cgp_generic_utils.constants.RotateOrder`
 
-        :return: the transformMatrix
-        :rtype: :class:`cgp_generic_utils.api.TransformationMatrix`
+        :return: the transformationMatrix of the transform
+        :rtype: :class:`cgp_maya_utils.api.TransformationMatrix`
         """
 
         # init
@@ -607,19 +719,20 @@ class Transform(_generic.DagNode):
                              .format(rotateOrder, cgp_maya_utils.constants.RotateOrder.ALL))
 
         # return
-        return cgp_maya_utils.api.TransformationMatrix.fromAttribute('{0}.{1}'.format(self.name(), matrixAttr),
+        return cgp_maya_utils.api.TransformationMatrix.fromAttribute('{0}.{1}'.format(self.fullName(), matrixAttr),
                                                                      rotateOrder=rotateOrder)
 
     def transformValues(self, worldSpace=False, rotateOrder=None):
-        """the transform values
+        """get the transform values of transform
 
-        :param worldSpace: ``True`` : transform values are worldSpace - ``False`` : transform values are local
+        :param worldSpace: ``True`` : the transform values are queried in worldSpace -
+                           ``False`` : the transform values are queried in local
         :type worldSpace: bool
 
-        :param rotateOrder: rotateOrder to get the transform values in ! ONLY IN WORLDSPACE !
-        :type rotateOrder: str
+        :param rotateOrder: the rotateOrder to get the transform values in
+        :type rotateOrder: :class:`cgp_generic_utils.constants.RotateOrder`
 
-        :return: the transform values
+        :return: the transform values of the transform
         :rtype: dict
         """
 
@@ -643,10 +756,10 @@ class Transform(_generic.DagNode):
 
         :param mode: ``cgp_generic_utils.constants.TransformMode.ABSOLUTE`` : value is replaced, default mode -
                      ``cgp_generic_utils.constants.TransformMode.RELATIVE`` : value is added
-        :type mode: str
+        :type mode: :class:`cgp_generic_utils.constants.TransformMode`
         """
 
-        # get infos
+        # get info
         values = self.transformationMatrix(worldSpace=worldSpace).transformValues()
         isRelative = mode == cgp_generic_utils.constants.TransformMode.RELATIVE
 
@@ -656,41 +769,24 @@ class Transform(_generic.DagNode):
             y = y if y is not None else 0
             z = z if z is not None else 0
         else:
-            x = x if x is not None else values[cgp_maya_utils.constants.Transform.TRANSLATE_X]
-            y = y if y is not None else values[cgp_maya_utils.constants.Transform.TRANSLATE_Y]
-            z = z if z is not None else values[cgp_maya_utils.constants.Transform.TRANSLATE_Z]
+            x = x if x is not None else values[cgp_maya_utils.constants.Transform.TRANSLATE][0]
+            y = y if y is not None else values[cgp_maya_utils.constants.Transform.TRANSLATE][1]
+            z = z if z is not None else values[cgp_maya_utils.constants.Transform.TRANSLATE][2]
 
         # set values
-        maya.cmds.xform(self.name(), worldSpace=worldSpace, relative=isRelative, translation=[x, y, z])
+        maya.cmds.xform(self.fullName(), worldSpace=worldSpace, relative=isRelative, translation=[x, y, z])
 
     # PRIVATE COMMANDS #
 
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
-
-        :return: the available attributes
-        :rtype: list[str]
-        """
-
-        # init
-        availableAttributes = super(Transform, self)._availableAttributes()
-
-        # update settingAttributes
-        availableAttributes.extend(['displayRotatePivot',
-                                    'displayScalePivot'])
-
-        # return
-        return availableAttributes
-
     @staticmethod
     def _formatAttributes(attributes):
-        """format the transform attributes into a formated data list
+        """format the transform attributes into a formatted data list
 
         :param attributes: attributes to format
-        :type attributes: list[str]
+        :type attributes: list[:class:`cgp_maya_utils.constants.Transform`]
 
-        :return: the formated attributes
-        :rtype: list[str]
+        :return: the formatted attributes
+        :rtype: list[:class:`cgp_maya_utils.constants.Transform`]
         """
 
         # init
@@ -715,23 +811,26 @@ class Transform(_generic.DagNode):
         # return
         return list(reversed(sorted(set(attributes) - set(cgp_maya_utils.constants.Transform.GENERAL))))
 
-    @cgp_maya_utils.decorators.KeepCurrentSelection()
+    @cgp_maya_utils.decorators.KeepSelection()
     def _setTransformValues(self, values, attributes=None, worldSpace=False):
-        """set transform values from the dictionary to the specified object
+        """set transform values from a dictionary of values
 
-        :param values: the dictionary of the transform values to set on the specified object
+        :param values: the transform values to set on the transform
         :type values: dict
 
-        :param attributes: transform attributes to set - default is ``cgp_maya_utils.constants.Transform.GENERAL``
-        :type attributes: list[str]
+        :param attributes: the transform attributes to set - default is ``cgp_maya_utils.constants.Transform.GENERAL``
+        :type attributes: list[:class:`cgp_maya_utils.constants.Transform`]
 
-        :param worldSpace: ``True`` : transform values are set on worldSpace -
-                           ``False`` : transform values are set on local
+        :param worldSpace: ``True`` : the transform values are set on worldSpace -
+                           ``False`` : the transform values are set on local
         :type worldSpace: bool
         """
 
-        # init
+        # get info
+        fullName = self.fullName()
         attributes = self._formatAttributes(attributes)
+        toExcludeNodeTypes = (cgp_maya_utils.constants.NodeType.ANIM_CURVES
+                              + [cgp_maya_utils.constants.NodeType.ANIM_BLEND])
 
         # execute
         if worldSpace:
@@ -747,8 +846,7 @@ class Transform(_generic.DagNode):
 
             # rebase targetMatrix
             if self.parent():
-
-                # get infos
+                # get info
                 worldInvMatrixAttribute = self.parent().attribute('worldInverseMatrix')
                 rotateOrder = self.attribute('rotateOrder').value()
 
@@ -780,17 +878,17 @@ class Transform(_generic.DagNode):
         for attribute in attributes:
 
             # get fullAttribute
-            fullAttribute = '{0}.{1}'.format(self.name(), attribute)
+            fullAttribute = '{0}.{1}'.format(fullName, attribute)
 
             # get connections
-            genConnections = self.connections([attribute[0]],
-                                              nodeTypes=cgp_maya_utils.constants.NodeType.ANIM_CURVES,
+            genConnections = self.connections([attribute.translate(None, 'XYZ')],
+                                              nodeTypes=toExcludeNodeTypes,
                                               nodeTypesIncluded=False,
                                               sources=True,
                                               destinations=False)
 
             fullConnections = self.connections([attribute],
-                                               nodeTypes=cgp_maya_utils.constants.NodeType.ANIM_CURVES,
+                                               nodeTypes=toExcludeNodeTypes,
                                                nodeTypesIncluded=False,
                                                sources=True,
                                                destinations=False)
@@ -803,33 +901,231 @@ class Transform(_generic.DagNode):
 # TRANSFORM OBJECTS #
 
 
+class IkEffector(Transform):
+    """node object that manipulates an ``ikEffector`` node
+    """
+
+    # ATTRIBUTES #
+
+    _TYPE = cgp_maya_utils.constants.NodeType.IK_EFFECTOR
+
+
+class IkHandle(Transform):
+    """node object that manipulates an ``ikHandle`` node
+    """
+
+    # ATTRIBUTES #
+
+    _TYPE = cgp_maya_utils.constants.NodeType.IK_HANDLE
+
+    # OBJECT COMMANDS #
+
+    @classmethod
+    def create(cls, startJoint,
+               endJoint,
+               solverType=None,
+               connections=None,
+               attributeValues=None,
+               name=None,
+               **__):
+        """create an ikHandle of the specified solver type
+
+        :param startJoint: the startJoint of the ikHandle
+        :type startJoint: str or :class:`cgp_maya_utils.scene.Joint`
+
+        :param endJoint: the endJoint of the ikHandle
+        :type endJoint: str or :class:`cgp_maya_utils.scene.Joint`
+
+        :param solverType: the type of solver of the ikHandle to create - default is ``constants.Solver.IK_RP_SOLVER``
+        :type solverType: :class:`cgp_maya_utils.constants.Solver`
+
+        :param connections: the connections to set on the ikHandle
+        :type connections: list[tuple[str]]
+
+        :param attributeValues: the attribute values to set on the ikHandle
+        :type attributeValues: dict
+
+        :param name: the name of the ikHandle
+        :type name: str
+
+        :return: the ikHandle object
+        :rtype: :class:`cgp_maya_utils.scene.IkHandle`
+        """
+
+        # init
+        name = name or cls._TYPE
+        solverType = solverType or cgp_maya_utils.constants.Solver.IK_RP_SOLVER
+
+        # errors
+        if solverType not in cgp_maya_utils.constants.Solver.IK_SOLVERS:
+            raise ValueError('{0} is not a valid ik solver type - {1}'
+                             .format(solverType, cgp_maya_utils.constants.Solver.IK_SOLVERS))
+
+        # execute
+        ikHandle, effector = maya.cmds.ikHandle(startJoint=str(startJoint),
+                                                endEffector=str(endJoint),
+                                                solver=solverType,
+                                                name=name)
+
+        # get ikHandle object
+        ikHandleObject = cls(ikHandle)
+
+        # set attributeValues
+        if attributeValues:
+            ikHandleObject.setAttributeValues(attributeValues)
+
+        # set connections
+        if connections:
+            ikHandleObject.setConnections(connections)
+
+        # return
+        return ikHandleObject
+
+    # COMMANDS #
+
+    def data(self, worldSpace=False):
+        """get the data necessary to store the ikHandle node on disk and/or recreate it from scratch
+
+        :param worldSpace: ``True`` : ikHandle transforms are got in worldSpace -
+                           ``False`` : ikHandle transforms are got in local
+        :type worldSpace: bool
+
+        :return: the data of the ikHandle
+        :rtype: dict
+        """
+
+        # init
+        data = super(IkHandle, self).data(worldSpace=worldSpace)
+
+        # update data
+        data['startJoint'] = self.startJoint()
+        data['endJoint'] = self.endJoint()
+        data['effector'] = self.effector()
+
+        # return
+        return data
+
+    def effector(self):
+        """get the effector of the ikHandle
+
+        :return: the effector of the ikHandle
+        :rtype: :class:`cgp_maya_utils.scene.IkEffector`
+        """
+
+        # get the ikEffector
+        ikEffector = maya.cmds.ikHandle(self.fullName(), query=True, endEffector=True)
+
+        # return
+        return IkEffector(ikEffector)
+
+    def endJoint(self):
+        """get the end joint of the ikHandle
+
+        :return: the endJoint of the ikHandle
+        :rtype: :class:`cgp_maya_utils.scene.Joint`
+        """
+
+        # init
+        translateX = self.effector().attribute(cgp_maya_utils.constants.Transform.TRANSLATE_X)
+        effectorConnections = translateX.connections(source=True, destinations=False)
+
+        # return
+        return effectorConnections[0].source().node()
+
+    def setSolver(self, solverType):
+        """set the solver of the ikHandle
+
+        :param solverType: type of solver to set on the ikHandle
+        :type solverType: :class:`cgp_maya_utils.constants.Solver`
+        """
+
+        # execute
+        maya.cmds.ikHandle(self.fullName(), edit=True, solver=solverType)
+
+    def startJoint(self):
+        """get the startJoint of the ikHandle
+
+        :return: the startJoint of the ikHandle
+        :rtype: :class:`cgp_maya_utils.scene.Joint`
+        """
+
+        # get the startJoint
+        startJoint = maya.cmds.ikHandle(self.fullName(), query=True, startJoint=True)
+
+        # return
+        return cgp_maya_utils.scene._api._NODE_TYPES['joint'](startJoint)
+
+
 class Joint(Transform):
     """node object that manipulates a ``joint`` node
     """
 
     # ATTRIBUTES #
 
-    _nodeType = 'joint'
+    _TYPE = cgp_maya_utils.constants.NodeType.JOINT
 
-    # PRIVATE COMMANDS #
+    # OBJECT COMMANDS #
 
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
+    @classmethod
+    def create(cls,
+               translate=None,
+               rotate=None,
+               scale=None,
+               rotateOrder=None,
+               parent=None,
+               worldSpace=False,
+               connections=None,
+               attributeValues=None,
+               name=None,
+               **__):
+        """create a joint
 
-        :return: the available attributes
-        :rtype: list[str]
+        :param translate: the translation values of the joint
+        :type translate: list[int, float]
+
+        :param rotate: the rotation values of the joint
+        :type rotate: list[int, float]
+
+        :param scale: the scale values of the joint
+        :type scale: list[int, float]
+
+        :param rotateOrder: the rotateOrder of the joint
+        :type rotateOrder: :class:`cgp_maya_utils.constants.RotateOrder`
+
+        :param parent: the parent of the joint
+        :type parent: str or :class:`cgp_maya_utils.scene.DagNode`
+
+        :param worldSpace: ``True`` : the transform values are in worldSpace -
+                           ``False`` : the transform values are in local
+        :type worldSpace: bool
+
+        :param connections: the connections to set on the joint
+        :type connections: list[tuple[str]]
+
+        :param attributeValues: the attribute values to set on the joint
+        :type attributeValues: dict
+
+        :param name: the name of the joint
+        :type name: str
+
+        :return: the created joint
+        :rtype: :class:`cgp_maya_utils.scene.Joint`
         """
 
         # init
-        availableAttributes = super(Joint, self)._availableAttributes()
+        joint = super(Joint, cls).create(translate=translate,
+                                         rotate=rotate,
+                                         scale=scale,
+                                         rotateOrder=rotateOrder,
+                                         parent=parent,
+                                         worldSpace=worldSpace,
+                                         connections=connections,
+                                         name=name,
+                                         **__)
 
-        # update settingAttributes
-        availableAttributes.extend(['drawLabel',
-                                    'jointOrient',
-                                    'otherType',
-                                    'segmentScaleCompensate',
-                                    'side',
-                                    'type'])
+        # set attribute values
+        if attributeValues:
+            joint.setAttributeValues(attributeValues)
 
         # return
-        return availableAttributes
+        return joint

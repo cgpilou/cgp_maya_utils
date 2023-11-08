@@ -8,6 +8,7 @@ import maya.api.OpenMaya
 
 # imports local
 import cgp_maya_utils.constants
+import cgp_maya_utils.decorators
 import cgp_maya_utils.scene._api
 from . import _generic
 
@@ -16,41 +17,41 @@ from . import _generic
 
 
 class GeometryFilter(_generic.Node):
-    """node object that manipulates any kind of geometry filter node
+    """node object that manipulates any kind of geometryFilter node
     """
 
     # ATTRIBUTES #
 
-    _nodeType = 'geometryFilter'
+    _TYPE = cgp_maya_utils.constants.NodeType.GEOMETRY_FILTER
 
-    # STATIC COMMANDS #
+    # OBJECT COMMANDS #
 
     @classmethod
-    def create(cls, geometry, connections=None, attributeValues=None, name=None, **kwargs):
-        """create a geometry filter
+    def create(cls, geometry, connections=None, attributeValues=None, name=None, **__):
+        """create a geometryFilter
 
-        :param geometry: geometry to bind the created geometry filter to
+        :param geometry: geometry to bind the created geometryFilter to
         :type geometry: str
 
-        :param connections: connections to set on the created geometry filter
+        :param connections: connections to set on the created geometryFilter
         :type connections: list[tuple[str]]
 
-        :param attributeValues: attribute values to set on the created geometry filter
+        :param attributeValues: attribute values to set on the created geometryFilter
         :type attributeValues: dict
 
-        :param name: name of the created geometry filter
+        :param name: name of the created geometryFilter
         :type name: str
 
-        :return: the created geometry filter object
+        :return: the created geometryFilter object
         :rtype: :class:`cgp_maya_utils.scene.GeometryFilter`
         """
 
         # errors
-        if cls._nodeType == 'geometryFilter':
-            raise RuntimeError('GeometryFilter.create is not callable for untyped geometry filters')
+        if cls._TYPE == cgp_maya_utils.constants.NodeType.GEOMETRY_FILTER:
+            raise RuntimeError('GeometryFilter.create is not callable for untyped geometryFilters')
 
         # create node
-        deformerNode = maya.cmds.deformer(geometry, type=cls._nodeType, name=name or cls._nodeType)[0]
+        deformerNode = maya.cmds.deformer(geometry, type=cls._TYPE, name=name or cls._TYPE)[0]
         deformerObject = cls(deformerNode)
 
         # set attributeValues
@@ -67,20 +68,20 @@ class GeometryFilter(_generic.Node):
     # COMMANDS #
 
     def bind(self, shape):
-        """bind the geometry filter to the specified shape
+        """bind the geometryFilter to the shape
 
-        :param shape: shape the geometry filter node will be bound to - can be the shape or its transform
-        :type shape: str or :class:`cgp_maya_utils.scene.Shape` or :class:`cgp_maya_utils.scene.Transform`
+        :param shape: shape the geometryFilter will be bound to - can be the shape or its transform
+        :type shape: str or :class:`cgp_maya_utils.scene.Shape` or :class:`cgp_maya_utils.Transform`
         """
 
         # execute
         maya.cmds.deformer(self.name(), edit=True, geometry=str(shape))
 
     def copy(self, shape, byProximity=True):
-        """copy the geometry filter node to the shape
+        """copy the geometryFilter to the shape
 
-        :param shape: shape on which to copy the geometry filter node
-        :type shape: str or :class:`cgp_maya_utils.scene.Shape`
+        :param shape: shape on which to copy the geometryFilter
+        :type shape: str
 
         :param byProximity: ``True`` : weights are copied by proximity - ``False`` : weights are injected on points
         :type byProximity: bool
@@ -90,9 +91,9 @@ class GeometryFilter(_generic.Node):
         raise NotImplementedError('copy needs to be implemented')
 
     def data(self):
-        """data necessary to store the geometry filter node on disk and/or recreate it from scratch
+        """data necessary to store the geometryFilter node on disk and/or recreate it from scratch
 
-        :return: the data of the geometry filter node
+        :return: the data of the geometryFilter
         :rtype: dict
         """
 
@@ -100,90 +101,83 @@ class GeometryFilter(_generic.Node):
         data = super(GeometryFilter, self).data()
 
         # update data
-        data['shapes'] = [sh.name() for sh in self.shapes()]
+        data['shapes'] = [shape.name() for shape in self.shapes()]
         data['weights'] = self.weights()
 
         # return
         return data
 
     def reset(self):
-        """reset the geometry filter node
+        """reset the geometryFilter
         """
 
         # execute
-        raise NotImplementedError('{0}.reset() needs to be implemented'.format(self.__class__.__name__))
+        raise NotImplementedError('reset needs to be implemented')
+
+    def setData(self, data):
+        """set the data on the geometryFilter
+
+        :param data: data used to set the geometryFilter
+        :type data: dict
+        """
+
+        # execute
+        raise NotImplementedError('setData needs to be implemented')
 
     def shapes(self):
-        """the shapes deformed by the geometry filter node
+        """get the shapes deformed by the geometryFilter
 
-        :return: the deformed shapes
+        :return: the shapes of the geometryFilter
         :rtype: list[:class:`cgp_maya_utils.scene.Shape`]
         """
 
         # get shapes
-        shapes = maya.cmds.deformer(self.name(), query=True, geometry=True)
+        shapes = maya.cmds.deformer(self.name(), query=True, geometry=True) or []
 
         # return
         return [cgp_maya_utils.scene._api.node(sh) for sh in shapes]
 
-    def weights(self):
-        """the weights of the geometry filter node - same weights that are accessible through painting
+    def setShapes(self, shapes):
+        """set the shapes deformed by the geometryFilter
 
-        :return: the weights of the geometry filter node
+        :param shapes: the shapes that will be deformed by the geometryFilter
+        :type shapes: list[str] or list[:class:`cgp_maya_utils.scene.Shape`]
+        """
+
+        # get the current shapes
+        currentlyDeformed = self.shapes()
+
+        # remove unwanted shapes
+        toRemove = [geometry for geometry in currentlyDeformed if geometry not in shapes]
+        if toRemove:
+            maya.cmds.deformer(self.name(), edit=True, geometry=toRemove, remove=True)
+
+        # add missing shapes
+        maya.cmds.deformer(self.name(), edit=True, geometry=shapes)
+
+    def weights(self):
+        """get the weights of the geometryFilter - same weights that are accessible through painting
+
+        :return: the weights of the geometryFilter
         :rtype: any
         """
 
         # execute
-        raise NotImplementedError('{0}.weights() needs to be implemented'.format(self.__class__.__name__))
-
-    # PRIVATE COMMANDS #
-
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
-
-        :return: the available attributes
-        :rtype: list[str]
-        """
-
-        # init
-        availableAttributes = super(GeometryFilter, self)._availableAttributes()
-
-        # update settingAttributes
-        availableAttributes.extend(['envelope'])
-
-        # return
-        return availableAttributes
+        raise NotImplementedError('weights needs to be implemented')
 
 
-# GEOMETRY FILTER OBJECTS #
+# DEFORMER OBJECTS #
 
 
 class BlendShape(GeometryFilter):
+    """node object that manipulates a ``blendShape`` node
+    """
 
     # ATTRIBUTES #
 
-    _nodeType = 'blendShape'
+    _TYPE = cgp_maya_utils.constants.NodeType.BLEND_SHAPE
 
-    # PROPERTIES #
-
-    @property
-    def _availableAttributes(self):
-        """get the setting attributes
-
-        :return: the setting attributes
-        :rtype: dict
-        """
-
-        # init
-        settingAttributes = super(GeometryFilter, self)._availableAttributes
-
-        # update settingAttributes
-        settingAttributes.extend(['supportNegativeWeights'])
-
-        # return
-        return settingAttributes
-
-    # OBJECT COMMANDS #
+    # COMMANDS #
 
     def setTarget(self, name, positions, indexes):
         """set a target to the blendShape - if target name is already exists, target will be updated. Otherwise,
@@ -192,10 +186,10 @@ class BlendShape(GeometryFilter):
         :param name: name of the target to set
         :type name: str
 
-        :param positions: positions of the vertices of the target - [[x1, y1, z1], [x2, y2, z2], ...]
+        :param positions: positions of the vertices of the target - ``[[x1, y1, z1], [x2, y2, z2], ...]``
         :type positions: list[list[float]] or array[array[float]]
 
-        :param indexes: indexes of the vertices of the target - [index1, index2 ...]
+        :param indexes: indexes of the vertices of the target - ``[index1, index2 ...]``
         :type indexes: list[int] or array[int]
         """
 
@@ -239,7 +233,7 @@ class BlendShape(GeometryFilter):
         maya.cmds.aliasAttr(name, '{0}.weight[{1}]'.format(self.name(), shapeIndex))
 
     def targets(self):
-        """get the list of targets of the blendShape
+        """get the targets of the blendShape
 
         :return: targets of the blendShape
         :rtype: list[str]
@@ -249,13 +243,169 @@ class BlendShape(GeometryFilter):
         return maya.cmds.listAttr(self.name(), multi=True, string='weight') or []
 
 
+class SoftMod(GeometryFilter):
+    """node object that manipulates a ``softMod`` node
+    """
+
+    # ATTRIBUTES #
+
+    _TYPE = cgp_maya_utils.constants.NodeType.SOFT_MOD
+
+    # OBJECT COMMANDS #
+
+    @classmethod
+    def create(cls, shapesToDeform, name=None, weightedNode=None, connections=None, attributeValues=None, **__):
+        """create a softMod
+
+        :param shapesToDeform: shapes on which to create the softMod
+        :type shapesToDeform: list[str] or list[:class:`cgp_maya_utils.Shape`]
+
+        :param name: name of the created softMod
+        :type name: str
+
+        :param weightedNode: the node which will drive the softMod weight
+        :type weightedNode: str or :class:`cgp_maya_utils3.scene.Node`
+
+        :param connections: connections to set on the created softMod
+        :type connections: list[tuple[str]]
+
+        :param attributeValues: attribute values to set on the created softMod
+        :type attributeValues: dict
+
+        :return: the created softMod
+        :rtype: :class:`cgp_maya_utils.scene.SoftMod`
+        """
+
+        # init
+        name = name or cls._TYPE
+
+        # create the softMod
+        with cgp_maya_utils.decorators.DisableIntermediateStatus(shapesToDeform):
+            _, transformName = (maya.cmds.softMod(shapesToDeform,
+                                                  weightedNode=(str(weightedNode), str(weightedNode)),
+                                                  falloffAroundSelection=False,
+                                                  falloffRadius=1)
+                                if weightedNode
+                                else maya.cmds.softMod(shapesToDeform,
+                                                       falloffAroundSelection=False,
+                                                       falloffRadius=1))
+
+        # the maya command return the correct handle name but not the correct deformer name, so we need to find it
+        deformerName = maya.cmds.listConnections(transformName,
+                                                 source=False,
+                                                 destination=True,
+                                                 type=cgp_maya_utils.constants.NodeType.SOFT_MOD)[0]
+
+        # generate the deformer instance
+        instance = cls(deformerName)
+
+        # match the desired name
+        instance.setName(name)
+
+        # set attributeValues
+        if attributeValues:
+            instance.setAttributeValues(attributeValues)
+
+        # set connections
+        if connections:
+            instance.setConnections(connections)
+
+        # return
+        return instance
+
+    def handle(self):
+        """get the handle of the softMod
+
+        :return: the handle of the softMod
+        :rtype: Shape
+        """
+
+        # find the handle in the incoming connections
+        attribute = self.attribute('softModXforms')
+        connections = attribute.connections(source=True,
+                                            destinations=False,
+                                            nodeTypes=[cgp_maya_utils.constants.NodeType.SOFT_MOD_HANDLE])
+
+        # return the handle if found
+        return connections[0].source().node() if connections else None
+
+    def shapes(self):
+        """get the shapes deformed by the softMod
+
+        :return: the shapes deformed by the softMod
+        :rtype: Shape
+        """
+
+        # get all related shapes
+        shapes = super(SoftMod, self).shapes()
+
+        # disable intermediate objects to get correct shapes
+        with cgp_maya_utils.decorators.DisableIntermediateStatus(shapes):
+            shapes = super(SoftMod, self).shapes()
+
+        # return
+        return shapes
+
+    def setShapes(self, shapes):
+        """set the shapes deformed by the softMod
+
+        :param shapes: the shapes to set on the softMod
+        :type shapes: list[str] or list[:class:`cgp_maya_utils.scene.Shape`]
+        """
+
+        # get the geometries to remove
+        toRemove = [geometry for geometry in self.shapes() if geometry not in shapes]
+
+        # remove geometries
+        if toRemove:
+            with cgp_maya_utils.decorators.DisableIntermediateStatus(toRemove):
+                maya.cmds.softMod(self.name(), edit=True, geometry=toRemove, remove=True)
+
+        # add missing shapes
+        with cgp_maya_utils.decorators.DisableIntermediateStatus(shapes):
+            maya.cmds.softMod(self.name(), edit=True, geometry=shapes)
+
+    def setWeightedNode(self, node):
+        """set the weightedNode of the softMod
+
+        :param node: the weightedNode of the softMod
+        :type node: str or :class:`cgp_maya_utils.scene.Transform`
+        """
+
+        # execute
+        maya.cmds.softMod(self.name(), edit=True, bindState=True, weightedNode=(str(node), str(node)))
+
+    def weightedNode(self):
+        """get the weightedNode of the softMod
+
+        :return: the weightedNode of the softMod
+        :rtype: Transform
+        """
+
+        # get the name of the weightedNode
+        nodeName = maya.cmds.softMod(self.name(), query=True, weightedNode=True)
+
+        # return
+        return cgp_maya_utils.scene._api.node(nodeName) if nodeName else None
+
+    def weights(self):
+        """get the weights of the softMod
+
+        :return: the weights of the softMod
+        :rtype: dict
+        """
+
+        # return
+        return {}
+
+
 class SkinCluster(GeometryFilter):
     """node object that manipulates a ``skinCluster`` node
     """
 
     # ATTRIBUTES #
 
-    _nodeType = 'skinCluster'
+    _TYPE = cgp_maya_utils.constants.NodeType.SKINCLUSTER
 
     # OBJECT COMMANDS #
 
@@ -264,7 +414,7 @@ class SkinCluster(GeometryFilter):
         """create a skinCluster
 
         :param shapes: shapes that will be deformed by the skinCluster
-        :type shapes: list[str] or list[:class:`cgp_maya_utils.scene.Shape`]
+        :type shapes: list[str or :class:`cgp_maya_utils.scene.Shape`]
 
         :param influences: influences that will drive the skinCluster
         :type influences: list[str] or list[:class:`cgp_maya_utils.scene.Joint`, :class:`cgp_maya_utils.scene.Shape`]
@@ -287,9 +437,7 @@ class SkinCluster(GeometryFilter):
         """
 
         # init
-        shapes = [str(shape) for shape in shapes]
-        influences = [str(influence) for influence in influences]
-        name = name or cls._nodeType
+        name = name or cls._TYPE
         tempJt = None
         obj = cgp_maya_utils.scene._api.node(shapes[0])
         buildObj = obj
@@ -338,7 +486,7 @@ class SkinCluster(GeometryFilter):
 
         # build bindPreMatrixes
         if bindPreMatrixes:
-            skinCluster.connectBindPreMatrixes(bindPreMatrixes=bindPreMatrixes)
+            skinCluster.setBindPreMatrixes(bindPreMatrixes=bindPreMatrixes)
 
         # set attributeValues
         if attributeValues:
@@ -358,7 +506,7 @@ class SkinCluster(GeometryFilter):
         """add influence to the skinCluster
 
         :param influence: influence to add to the skinCluster
-        :type influence: str
+        :type influence: str or :class:`cgp_maya_utils.scene.Joint` or :class:`cgp_maya_utils.scene.Shape`
         """
 
         # init
@@ -416,42 +564,11 @@ class SkinCluster(GeometryFilter):
         # return
         return data
 
-    def connectBindPreMatrixes(self, bindPreMatrixes=None):
-        """connect the bindPreMatrixes of the skinCluster
+    def copy(self, targetShape, byProximity=True):
+        """copy the skinCluster to the target shape
 
-        :param bindPreMatrixes: bindPreMatrixes of the skinCluster -
-                                ``{influence1: matrixAttribute1, influence2: matrixAttribute2 ...}``
-        :type bindPreMatrixes: dict
-        """
-
-        # remove existing bpm connections
-        connections = self.connections(attributes=['bindPreMatrix'], sources=True, destinations=False)
-
-        for connection in connections:
-            connection.disconnect()
-
-        # build bpm
-        if bindPreMatrixes:
-
-            # get matrix connections
-            matrixConnections = self.connections(attributes=['matrix'], sources=True, destinations=True)
-
-            # execute
-            for matrixConnection in matrixConnections:
-
-                # get bpm connections
-                influence = matrixConnection.source().node().name()
-                bpmAttr = matrixConnection.destination().fullName().replace('.matrix', '.bindPreMatrix')
-
-                # build bpm connection
-                if bindPreMatrixes[influence]:
-                    maya.cmds.connectAttr(bindPreMatrixes[influence], bpmAttr, force=True)
-
-    def copy(self, shape, byProximity=True):
-        """copy the skinCluster to the shape
-
-        :param shape: shape on which to copy the skinCluster
-        :type shape: str or :class:`cgp_maya_utils.scene.Shape`
+        :param targetShape: shape on which to copy the skinCluster
+        :type targetShape: str or :class:`cgp_maya_utils.Shape`
 
         :param byProximity: ``True`` : weights are copied by proximity - ``False`` : weights are injected on points
         :type byProximity: bool
@@ -460,12 +577,15 @@ class SkinCluster(GeometryFilter):
         :rtype: :class:`cgp_maya_utils.scene.SkinCluster`
         """
 
+        # init
+        shapes = self.shapes()
+
         # errors
-        if not self.shapes():
+        if not shapes:
             raise RuntimeError('{0} has no shapes to copy from'.format(self.name()))
 
         # build target skinCluster
-        targetSkin = self.create([shape],
+        targetSkin = self.create([str(targetShape)],
                                  influences=self.influences(),
                                  bpm=self.bindPreMatrixes(),
                                  attributeValues=self.attributeValues())
@@ -489,7 +609,7 @@ class SkinCluster(GeometryFilter):
     def data(self):
         """data necessary to store the skinCluster node on disk and/or recreate it from scratch
 
-        :return: the data of the skinCluster node
+        :return: the data of the skinCluster
         :rtype: dict
         """
 
@@ -505,7 +625,7 @@ class SkinCluster(GeometryFilter):
         return data
 
     def influences(self):
-        """the influences of the skinCluster
+        """get the influences of the skinCluster
 
         :return: the influences of the skinCluster
         :rtype: list[:class:`cgp_maya_utils.scene.Joint`, :class:`cgp_maya_utils.scene.Shape`]
@@ -518,7 +638,7 @@ class SkinCluster(GeometryFilter):
         return [cgp_maya_utils.scene._api.node(influence) for influence in influences]
 
     def removeInfluence(self, influence):
-        """remove an influence from the skinCluster
+        """remove the influence from the skinCluster
 
         :param influence: the influence to remove from the skinCluster
         :type influence: str or :class:`cgp_maya_utils.scene.Joint` or :class:`cgp_maya_utils.scene.Shape`
@@ -528,7 +648,7 @@ class SkinCluster(GeometryFilter):
         maya.cmds.skinCluster(self.name(), edit=True, removeInfluence=str(influence))
 
     def recacheBindMatrices(self):
-        """recache the bind matrixes of the skinCluster
+        """recache the bindMatrices of the skinCluster
         """
 
         # execute
@@ -558,6 +678,37 @@ class SkinCluster(GeometryFilter):
         # recache bindMatrices
         self.recacheBindMatrices()
 
+    def setBindPreMatrixes(self, bindPreMatrixes=None):
+        """set the bindPreMatrices of the skinCluster
+
+        :param bindPreMatrices: the bindPreMatrices to set on the skinCluster -
+                                ``{influence1: matrixAttribute1, influence2: matrixAttribute2 ...}``
+        :type bindPreMatrices: dict
+        """
+
+        # remove existing bpm connections
+        connections = self.connections(attributes=['bindPreMatrix'], sources=True, destinations=False)
+
+        for connection in connections:
+            connection.disconnect()
+
+        # build bpm
+        if bindPreMatrixes:
+
+            # get matrix connections
+            matrixConnections = self.connections(attributes=['matrix'], sources=True, destinations=True)
+
+            # execute
+            for matrixConnection in matrixConnections:
+
+                # get bpm connections
+                influence = matrixConnection.source().node().name()
+                bpmAttr = matrixConnection.destination().fullName().replace('.matrix', '.bindPreMatrix')
+
+                # build bpm connection
+                if bindPreMatrixes[influence]:
+                    maya.cmds.connectAttr(bindPreMatrixes[influence], bpmAttr, force=True)
+
     def setWeights(self, weights):
         """set the weights of the skinCluster
 
@@ -576,7 +727,7 @@ class SkinCluster(GeometryFilter):
 
         # flood to 1 on first joint
         maya.cmds.skinPercent(self.name(), self.shapes()[0], transformValue=(str(influences[0]), 1))
-        pttAttribute.connect(source='{0}.message'.format(influences[0]))
+        pttAttribute.connect('{0}.message'.format(influences[0]))
 
         # apply influences
         for influence in influences[1:]:
@@ -589,7 +740,7 @@ class SkinCluster(GeometryFilter):
             else:
 
                 # connect joint to paint attribute
-                pttAttribute.connect(source='{0}.message'.format(influence))
+                pttAttribute.connect('{0}.message'.format(influence))
 
                 # set paint attribute and lock joint
                 ptwAttribute.setValue(weights[influence.name()])
@@ -599,12 +750,12 @@ class SkinCluster(GeometryFilter):
                 maya.cmds.refresh()
 
     def swapInfluences(self, oldFlag, newFlag, reset=True):
-        """swap current influences by new influences using the flags
+        """swap current influences by new influences using the specified flags
 
-        :param oldFlag: flag that will be replaced by the new flag
+        :param oldFlag: flag that will be replaced in the current influences to find the influences to replace with
         :type oldFlag: str
 
-        :param newFlag: flag that will replace the old flag
+        :param newFlag: flag that will replace the old one to find the influences to add to the skinCluster
         :type newFlag: str
 
         :param reset: ``True`` : skinCluster will be reset after the swap - ``False`` : skinCluster will not be reset
@@ -635,9 +786,9 @@ class SkinCluster(GeometryFilter):
             self.reset()
 
     def unusedInfluences(self):
-        """the unused influences of the skinCluster
+        """get the unused influences of the skinCluster
 
-        :return: the unused influences
+        :return: the unused influences of the skinCluster
         :rtype: list[:class:`cgp_maya_utils.scene.Joint`, Shape]
         """
 
@@ -648,7 +799,7 @@ class SkinCluster(GeometryFilter):
         return [influence for influence in self.influences() if influence not in weightedInfluences]
 
     def weights(self):
-        """the weights of the geometry filter node - same weights that are accessible through painting
+        """get the weights of the skinCluster - same weights that are accessible through painting
 
         :return: the weights of the skinCluster - ``{joint1: [], joint2: [] ...}``
         :rtype: dict
@@ -670,27 +821,3 @@ class SkinCluster(GeometryFilter):
 
         # return
         return data
-
-    # PRIVATE COMMANDS #
-
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
-
-        :return: the available attributes
-        :rtype: list[str]
-        """
-
-        # init
-        availableAttributes = super(SkinCluster, self)._availableAttributes()
-
-        # return
-        availableAttributes.extend(['deformUserNormals',
-                                    'dqsScale',
-                                    'dqsSupportNonRigid',
-                                    'normalizeWeights',
-                                    'skinningMethod',
-                                    'useComponents',
-                                    'weightDistribution'])
-
-        # return
-        return availableAttributes

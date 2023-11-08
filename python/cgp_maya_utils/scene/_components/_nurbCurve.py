@@ -13,7 +13,7 @@ class CurvePoint(_generic.TransformComponent):
 
     # ATTRIBUTES #
 
-    _componentType = cgp_maya_utils.constants.ComponentType.CURVE_POINT
+    _TYPE = cgp_maya_utils.constants.ComponentType.CURVE_POINT
 
 
 class EditPoint(_generic.TransformComponent):
@@ -22,4 +22,4 @@ class EditPoint(_generic.TransformComponent):
 
     # ATTRIBUTES #
 
-    _componentType = cgp_maya_utils.constants.ComponentType.EDIT_POINT
+    _TYPE = cgp_maya_utils.constants.ComponentType.EDIT_POINT

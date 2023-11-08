@@ -3,14 +3,22 @@ constraint object library
 """
 
 # imports third-parties
+import maya.cmds
+import maya.api.OpenMaya
+
+# imports rodeo
 import cgp_generic_utils.python
 import cgp_generic_utils.constants
-import maya.cmds
 
 # imports local
 import cgp_maya_utils.constants
 import cgp_maya_utils.scene._api
 from . import _generic
+
+
+INCREMENT_PREFIXES = ['first', 'second', 'third',
+                      'fourth', 'fifth', 'sixth',
+                      'seventh', 'eighth', 'ninth']
 
 
 # BASE OBJECT #
@@ -22,12 +30,38 @@ class Constraint(_generic.DagNode):
 
     # ATTRIBUTES #
 
-    _nodeType = 'constraint'
+    _TYPE = cgp_maya_utils.constants.NodeType.CONSTRAINT
+
+    # PROPERTIES #
+
+    @property
+    def inputs(self):
+        """get the input attributes of the constraint that are connected to the drivers of the constraint
+        Those attributes ares scanned to get the driver nodes through connection
+
+        :return: the input attributes connected to the driver transforms
+        :rtype: list[str]
+        """
+
+        # execute
+        return []
+
+    @property
+    def outputs(self):
+        """get the output attributes of the constraint that are connected to the driven of the constraint
+        Those attributes ares scanned to get the driven nodes through connection
+
+        :return: the output attributes connected to the driven transform
+        :rtype: list[str]
+        """
+
+        # execute
+        return []
 
     # COMMANDS #
 
     def data(self):
-        """data necessary to store the constraint node on disk and/or recreate it from scratch
+        """get data necessary to store the constraint node on disk and/or recreate it from scratch
 
         :return: the data of the constraint
         :rtype: dict
@@ -35,20 +69,20 @@ class Constraint(_generic.DagNode):
 
         # init
         data = super(Constraint, self).data()
+        driven = self.driven()
 
         # update data
-        data['drivers'] = [xform.name() for xform in self.driverTransforms()]
-        data['driven'] = self.drivenTransform().name()
+        data['drivers'] = [xform.name() for xform in self.drivers()]
+        data['driven'] = driven.name() if driven else None
         data['drivenAttributes'] = [attr.name() for attr in self.drivenAttributes()]
-        data['weights'] = self.weights()
 
         # return
         return data
 
-    def drivenTransform(self):
-        """the transform that is driven by the constraint
+    def driven(self):
+        """get the transform that is driven by the constraint
 
-        :return: the driven transform
+        :return: the driven transform of the constraint
         :rtype: :class:`cgp_maya_utils.scene.Transform` or :class:`cgp_maya_utils.scene.Joint`
         """
 
@@ -56,7 +90,7 @@ class Constraint(_generic.DagNode):
         data = []
 
         #  execute
-        for output in self._drivenOutputs():
+        for output in self.outputs:
             connectedNodes = maya.cmds.listConnections('{0}.{1}'.format(self.name(), output),
                                                        source=False,
                                                        destination=True) or []
@@ -66,17 +100,17 @@ class Constraint(_generic.DagNode):
         return cgp_maya_utils.scene._api.node(data[0]) if data else None
 
     def drivenAttributes(self):
-        """the attributes of the driven transform that are driven by the constraint
+        """get the attributes of the driven transform that are driven by the constraint
 
-        :return: the driven attributes
-        :rtype: list[:class:`cgp_maya_utils.scene.Attribute`]
+        :return: the driven attributes of the driven transform
+        :rtype: list[Attribute]
         """
 
         # init
         data = []
 
         # get driven data
-        for output in self._drivenOutputs():
+        for output in self.outputs:
 
             # get connections
             connections = maya.cmds.listConnections('{0}.{1}'.format(self.name(), output),
@@ -92,10 +126,10 @@ class Constraint(_generic.DagNode):
         # return
         return [cgp_maya_utils.scene._api.attribute(con) for con in data]
 
-    def driverTransforms(self):
-        """the transforms that drives the constraint
+    def drivers(self):
+        """get the transforms that drive the constraint
 
-        :return: the driver transforms
+        :return: the driver transforms of the constraint
         :rtype: list[:class:`cgp_maya_utils.scene.Transform`, :class:`cgp_maya_utils.scene.Joint`]
         """
 
@@ -103,7 +137,7 @@ class Constraint(_generic.DagNode):
         data = []
 
         #  execute
-        for inp in self._driverInputs():
+        for inp in self.inputs:
 
             # get full attribute
             fullAttribute = '{0}.{1}'.format(self.name(), inp)
@@ -126,10 +160,10 @@ class Constraint(_generic.DagNode):
 
             # errors
             except ValueError:
-                print 'can\'t get connections from {0}'.format(fullAttribute)
+                maya.cmds.warning('can\'t get connections from {0}'.format(fullAttribute))
 
         # return
-        return [cgp_maya_utils.scene._api.node(item) for item in data] or None
+        return [cgp_maya_utils.scene._api.node(item) for item in data]
 
     def isValid(self):
         """check is the constraint is valid by verifying if it has driver and driven transforms connected
@@ -139,80 +173,9 @@ class Constraint(_generic.DagNode):
         """
 
         # return
-        return self.driverTransforms() and self.drivenTransform()
-
-    def setWeights(self, values):
-        """set the weights of the constraint
-
-        :param values: the values of the weights to set
-        :type values: list[int, float]
-        """
-
-        # execute
-        for index, weightAttribute in enumerate(self.weightAttributes()):
-            weightAttribute.setValue(values[index])
-
-    def weights(self):
-        """get the weights of the constraint
-
-        :return: the weights of the constraint
-        :rtype: list[float]
-        """
-
-        # return
-        return [attribute.value() for attribute in self.weightAttributes()]
-
-    def weightAttributes(self):
-        """get the weight attributes
-
-        :return: the weight attributes
-        :rtype: list[:class:`cgp_maya_utils.scene.DoubleAttribute`]
-        """
-
-        # return
-        return [cgp_maya_utils.scene.DoubleAttribute('{0}.{1}'.format(self.name(), weightAlias))
-                for weightAlias in getattr(maya.cmds, self._nodeType)(self.name(), query=True, weightAliasList=True)]
+        return self.drivers() and self.driven()
 
     # PRIVATE COMMANDS #
-
-    def _driverInputs(self):
-        """the input attributes of the constraint that are connected to the drivers of the constraint
-        Those attributes ares scanned to get the driver nodes through connection
-
-        :return: the input attributes connected to the drivers
-        :rtype: list[str]
-        """
-
-        # execute
-        return []
-
-    def _drivenOutputs(self):
-        """the output attributes of the constraint that are connected to the driven of the constraint
-        Those attributes ares scanned to get the driven nodes through connection
-
-        :return: the output attributes connected to the driven
-        :rtype: list[str]
-        """
-
-        # execute
-        return []
-
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
-
-        :return: the available attributes
-        :rtype: list[str]
-        """
-
-        # init
-        availableAttributes = super(Constraint, self)._availableAttributes()
-
-        # update settingAttributes
-        availableAttributes.extend(['enableRestPosition',
-                                    'lockOutput'])
-
-        # return
-        return availableAttributes
 
     @staticmethod
     def _formatDrivenAttributes(driven, drivenAttributes=None):
@@ -235,13 +198,13 @@ class Constraint(_generic.DagNode):
         # errors
         for attr in drivenAttributes:
             if attr not in cgp_maya_utils.constants.Transform.ALL:
-                raise ValueError('{0} is not a valid driven attribute - {1}'
-                                 .format(attr, cgp_maya_utils.constants.Transform.ALL))
+                maya.cmds.warning('{0} is not a valid driven attribute - {1}'
+                                  .format(attr, cgp_maya_utils.constants.Transform.ALL))
 
         # execute
         for attr in drivenAttributes:
             if attr in cgp_maya_utils.constants.Transform.GENERAL:
-                for axe in cgp_generic_utils.constants.Axis.ALL:
+                for axe in cgp_generic_utils.constants.Axe.ALL:
                     data.append('{0}{1}'.format(attr[0].lower(), axe))
             else:
                 data.append('{0}{1}'.format(attr[0].lower(), attr[-1].lower()))
@@ -259,7 +222,34 @@ class AimConstraint(Constraint):
 
     # ATTRIBUTES #
 
-    _nodeType = 'aimConstraint'
+    _SUB_TYPE = cgp_generic_utils.constants.RigSubType.AIM
+    _TYPE = cgp_maya_utils.constants.NodeType.AIM_CONSTRAINT
+
+    # PROPERTIES #
+
+    @property
+    def inputs(self):
+        """get the input attributes of the constraint that are connected to the drivers of the constraint
+        Those attributes ares scanned to get the driver nodes through connection
+
+        :return: the input attributes connected to the driver transforms
+        :rtype: list[str]
+        """
+
+        # return
+        return ['target[*].targetParentMatrix']
+
+    @property
+    def outputs(self):
+        """the output attributes of the constraint that are connected to the driven of the constraint
+        Those attributes ares scanned to get the driven nodes through connection
+
+        :return: the output attributes connected to the driven transform
+        :rtype: list[str]
+        """
+
+        # return
+        return ['constraintRotate', 'constraintRotateX', 'constraintRotateY', 'constraintRotateZ']
 
     # COMMANDS #
 
@@ -268,37 +258,60 @@ class AimConstraint(Constraint):
                drivers,
                driven,
                drivenAttributes=None,
+               aimVector=None,
+               upVector=None,
+               worldUpType=None,
+               worldUpVector=None,
+               worldUpObject=None,
                maintainOffset=False,
-               weights=None,
                attributeValues=None,
                name=None,
                **__):
         """create an aimConstraint
 
         :param drivers: transforms driving the constraint
-        :type drivers: list[str] or list[:class:`cgp_maya_utils.scene.Node`]
+        :type drivers: list[str, :class:`cgp_maya_utils.scene.Node`, :class:`cgp_maya_utils.scene.Joint`]
 
         :param driven: transform driven by the constraint
-        :type driven: str or :class:`cgp_maya_utils.scene.Node`
+        :type driven: str or :class:`cgp_maya_utils.scene.Node` or :class:`cgp_maya_utils.scene.Joint`
 
         :param drivenAttributes: driven attributes controlled by the constraint - all attributes if nothing is specified
         :type drivenAttributes: list[:class:`cgp_maya_utils.constants.Transform`]
 
-        :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
+        :param aimVector: aim vector of the constraint
+        :type aimVector: list[float]
+
+        :param upVector: up vector of the constraint
+        :type upVector: list[float]
+
+        :param worldUpType: world up type of the constraint
+        :type worldUpType: :class:`cgp_maya_utils.constants.WorldUpType`
+
+        :param worldUpVector: world up vector of the constraint
+        :type worldUpVector: list[float]
+
+        :param worldUpObject: world up object of the constraint - If specified, worldUp vector will be ignored
+        :type worldUpObject: str or :class:`cgp_maya_utils.scene.Transform` or :class:`cgp_maya_utils.scene.Joint`
+
+        :param maintainOffset: ``True`` : the constraint is created with offset -
+                               ``False`` : the constraint is created without offset
         :type maintainOffset: bool
 
-        :param weights: values of the weight attributes of the constraint
-        :type weights: list[int, float]
-
-        :param attributeValues: attribute values to set on the constraint
+        :param attributeValues: attribute values to set on the created constraint
         :type attributeValues: dict
 
-        :param name: name of the constraint
+        :param name: name of the created constraint
         :type name: str
 
         :return: the created constraint
         :rtype: :class:`cgp_maya_utils.scene.AimConstraint`
         """
+
+        # errors
+        if not drivers or not driven:
+            maya.cmds.warning('no drivers and/or driven specified - drivers : {0} - driven : {1}'
+                              .format(drivers, driven))
+            return
 
         # init
         drivers = [str(driver) for driver in drivers]
@@ -309,111 +322,79 @@ class AimConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('no valid driven attributes specified')
+            raise RuntimeError('{0} can\'t be aimConstraint'.format(driven))
+
+        # get name
+        name = name or 'aimConstraint'
 
         # get skip attributes
-        skipAttributes = []
+        skip = []
 
-        for axe in cgp_generic_utils.constants.Axis.ALL:
+        for axe in cgp_generic_utils.constants.Axe.ALL:
             if 'r{0}'.format(axe) not in drivenAttributes:
-                skipAttributes.append(axe)
+                skip.append(axe)
 
-        # get infos
-        data = {'aimVector': [], 'upVector': [], 'worldUpVector': []}
+        # get info
+        data = {'aimVector': aimVector or [1, 0, 0],
+                'upVector': upVector or [0, 1, 0],
+                'worldUpType': worldUpType or cgp_maya_utils.constants.WorldUpType.VECTOR}
 
-        if attributeValues:
-
-            # get vectors
-            for attr in ['aimVector', 'upVector', 'worldUpVector']:
-                for axe in cgp_generic_utils.constants.Axis.ALL:
-
-                    # get value
-                    value = attributeValues['{0}{1}'.format(attr, axe.upper())]
-                    value = (cgp_maya_utils.scene._api.attribute(value).value()
-                             if isinstance(value, basestring)
-                             else value)
-
-                    # update vectors
-                    data[attr].append(value)
-
-            # get worldUpType
-            data['worldUpType'] = cgp_maya_utils.constants.WorldUpType.ALL[attributeValues['worldUpType']]
-
-            # get worldUpObject
-            if attributeValues['worldUpMatrix']:
-                data.pop('worldUpVector')
-                data['worldUpObject'] = (cgp_maya_utils.scene._api
-                                         .attribute(attributeValues['worldUpMatrix']).node().name())
-
+        if worldUpObject:
+            data['worldUpObject'] = str(worldUpObject)
         else:
-            data['aimVector'] = [1, 0, 0]
-            data['upVector'] = [0, 1, 0]
-            data['worldUpVector'] = [0, 1, 0]
-            data['worldUpType'] = cgp_maya_utils.constants.WorldUpType.VECTOR
+            data['worldUpVector'] = worldUpVector or [0, 1, 0]
 
         # execute
         node = maya.cmds.aimConstraint(drivers,
                                        driven,
-                                       name=name or '{0}_aimConstraint'.format(driven),
+                                       name=name,
                                        maintainOffset=maintainOffset,
-                                       skip=skipAttributes,
+                                       skip=skip,
                                        **data)[0]
 
-        constraintObject = cls(node)
+        cstrObject = cls(node)
 
         # apply attributeValues
         if attributeValues:
-            constraintObject.setAttributeValues(attributeValues)
-
-        # set weights
-        if weights:
-            constraintObject.setWeights(weights)
+            cstrObject.setAttributeValues(attributeValues)
 
         # return
-        return constraintObject
+        return cstrObject
 
-    # PRIVATE COMMANDS #
+    def data(self):
+        """get the data necessary to store the aimConstraint node on disk and/or recreate it from scratch
 
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
-
-        :return: the available attributes
-        :rtype: list[str]
+        :return: the data of the constraint
+        :rtype: dict
         """
 
         # init
-        availableAttributes = super(AimConstraint, self)._availableAttributes()
+        data = super(AimConstraint, self).data()
 
-        # update settingAttributes
-        availableAttributes.extend(['worldUpMatrix',
-                                    'aimVector',
-                                    'restRotate',
-                                    'upVector',
-                                    'worldUpType',
-                                    'worldUpVector'])
+        # update data
+        data['aimVector'] = self.attribute('aimVector').value()
+        data['upVector'] = self.attribute('upVector').value()
+        data['worldUpVector'] = self.attribute('worldUpVector').value()
+        data['worldUpObject'] = self.worldUpObject().name()
+
+        worldUpType = self.attribute('worldUpType').value(asString=False)
+        data['worldUpType'] = cgp_maya_utils.constants.WorldUpType.ALL[worldUpType]
 
         # return
-        return availableAttributes
+        return data
 
-    def _driverInputs(self):
-        """get inputs
+    def worldUpObject(self):
+        """get the worldUp object of the constraint
 
-        :return: the inputs of the constraint related to the drivers
-        :rtype: list[str]
+        :return: the worldUp object
+        :rtype: :class:`cgp_maya_utils.scene.Transform`
         """
 
-        # return
-        return ['target[*].targetParentMatrix']
-
-    def _drivenOutputs(self):
-        """get the outputs of the constraint
-
-        :return: the outputs of the constraint related to the driven
-        :rtype: list[str]
-        """
+        # get connections
+        connections = self.attribute('worldUpMatrix').connections(source=True, destinations=False)
 
         # return
-        return ['constraintRotate', 'constraintRotateX', 'constraintRotateY', 'constraintRotateZ']
+        return connections[0].source().node() if connections else None
 
 
 class OrientConstraint(Constraint):
@@ -422,7 +403,34 @@ class OrientConstraint(Constraint):
 
     # ATTRIBUTES #
 
-    _nodeType = 'orientConstraint'
+    _SUB_TYPE = cgp_generic_utils.constants.RigSubType.ORIENT
+    _TYPE = cgp_maya_utils.constants.NodeType.ORIENT_CONSTRAINT
+
+    # PROPERTIES #
+
+    @property
+    def inputs(self):
+        """get the input attributes of the constraint that are connected to the drivers of the constraint
+        Those attributes ares scanned to get the driver nodes through connection
+
+        :return: the input attributes connected to the driver transforms
+        :rtype: list[str]
+        """
+
+        # return
+        return ['target[*].targetRotate']
+
+    @property
+    def outputs(self):
+        """the output attributes of the constraint that are connected to the driven of the constraint
+        Those attributes ares scanned to get the driven nodes through connection
+
+        :return: the output attributes connected to the driven transform
+        :rtype: list[str]
+        """
+
+        # return
+        return ['constraintRotate', 'constraintRotateX', 'constraintRotateY', 'constraintRotateZ']
 
     # COMMANDS #
 
@@ -432,7 +440,6 @@ class OrientConstraint(Constraint):
                driven,
                drivenAttributes=None,
                maintainOffset=False,
-               weights=None,
                attributeValues=None,
                name=None,
                **__):
@@ -450,19 +457,22 @@ class OrientConstraint(Constraint):
         :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
         :type maintainOffset: bool
 
-        :param weights: values of the weight attributes of the constraint
-        :type weights: list[int, float]
-
-        :param attributeValues: attribute values to set on the constraint
+        :param attributeValues: attribute values to set on the created constraint
         :type attributeValues: dict
 
-        :param name: name of the constraint
+        :param name: name of the created constraint
         :type name: str
 
         :return: the created constraint
         :rtype: :class:`cgp_maya_utils.scene.OrientConstraint`
         """
 
+        # errors
+        if not drivers or not driven:
+            maya.cmds.warning('no drivers and/or driven specified - drivers : {0} - driven : {1}'
+                              .format(drivers, driven))
+            return
+
         # init
         drivers = [str(driver) for driver in drivers]
         driven = str(driven)
@@ -472,178 +482,64 @@ class OrientConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('no valid driven attributes specified')
+            raise RuntimeError('{0} can\'t be orientConstraint'.format(driven))
+
+        # get name
+        name = name or 'orientConstraint'
 
         # get skip attributes
-        skipAttributes = []
+        skip = []
 
         for axe in ['x', 'y', 'z']:
             if 'r{0}'.format(axe) not in drivenAttributes:
-                skipAttributes.append(axe)
+                skip.append(axe)
 
         # execute
         node = maya.cmds.orientConstraint(drivers,
                                           driven,
-                                          name=name or '{0}_orientConstraint'.format(driven),
+                                          name=name,
                                           maintainOffset=maintainOffset,
-                                          skip=skipAttributes)[0]
+                                          skip=skip)[0]
 
-        constraintObject = cls(node)
+        cstrObject = cls(node)
 
         # apply attributeValues
         if attributeValues:
-            constraintObject.setAttributeValues(attributeValues)
-
-        # set weights
-        if weights:
-            constraintObject.setWeights(weights)
+            cstrObject.setAttributeValues(attributeValues)
 
         # return
-        return constraintObject
-
-    # PRIVATE COMMANDS #
-
-    def _driverInputs(self):
-        """get inputs
-
-        :return: the inputs of the constraint related to the drivers
-        :rtype: list[str]
-        """
-
-        # return
-        return ['target[*].targetRotate']
-
-    def _drivenOutputs(self):
-        """get the outputs of the constraint
-
-        :return: the outputs of the constraint related to the driven
-        :rtype: list[str]
-        """
-
-        # return
-        return ['constraintRotate', 'constraintRotateX', 'constraintRotateY', 'constraintRotateZ']
-
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
-
-        :return: the available attributes
-        :rtype: list[str]
-        """
-
-        # init
-        availableAttributes = super(OrientConstraint, self)._availableAttributes()
-
-        # update settingAttributes
-        availableAttributes.extend(['interpType',
-                                    'restRotateX', 'restRotateY', 'restRotateZ'])
-
-        # return
-        return availableAttributes
+        return cstrObject
 
 
 class ParentConstraint(Constraint):
-    """node object that manipulates an ``parent`` constraint node
+    """node object that manipulates a ``parent`` constraint node
     """
 
     # ATTRIBUTES #
 
-    _nodeType = 'parentConstraint'
+    _SUB_TYPE = cgp_generic_utils.constants.RigSubType.PARENT
+    _TYPE = cgp_maya_utils.constants.NodeType.PARENT_CONSTRAINT
 
-    # COMMANDS #
+    # PROPERTIES #
 
-    @classmethod
-    def create(cls,
-               drivers,
-               driven,
-               drivenAttributes=None,
-               maintainOffset=False,
-               weights=None,
-               attributeValues=None,
-               name=None,
-               **__):
-        """create an parentConstraint
+    @property
+    def inputs(self):
+        """get the input attributes of the constraint that are connected to the drivers of the constraint
+        Those attributes ares scanned to get the driver nodes through connection
 
-        :param drivers: transforms driving the constraint
-        :type drivers: list[str] or list[:class:`cgp_maya_utils.scene.Transform`]
-
-        :param driven: transform driven by the constraint
-        :type driven: str or :class:`cgp_maya_utils.scene.Transform`
-
-        :param drivenAttributes: driven attributes controlled by the constraint - all attributes if nothing is specified
-        :type drivenAttributes: list[:class:`cgp_maya_utils.constants.Transform`]
-
-        :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
-        :type maintainOffset: bool
-
-        :param weights: values of the weight attributes of the constraint
-        :type weights: list[int, float]
-
-        :param attributeValues: attribute values to set on the constraint
-        :type attributeValues: dict
-
-        :param name: name of the constraint
-        :type name: str
-
-        :return: the created constraint
-        :rtype: :class:`cgp_may_utils.scene.ParentConstraint`
-        """
-
-        # init
-        drivers = [str(driver) for driver in drivers]
-        driven = str(driven)
-
-        # get driven attributes
-        drivenAttributes = cls._formatDrivenAttributes(driven, drivenAttributes=drivenAttributes)
-
-        # errors
-        if not drivenAttributes:
-            raise RuntimeError('no valid driven attributes specified')
-
-        # get skip attributes
-        skipAttributes = {'t': [], 'r': []}
-
-        for key in skipAttributes:
-            for axe in ['x', 'y', 'z']:
-                if '{0}{1}'.format(key, axe) not in drivenAttributes:
-                    skipAttributes[key].append(axe)
-
-        # execute
-        node = maya.cmds.parentConstraint(drivers,
-                                          driven,
-                                          name=name or '{0}_parentConstraint'.format(driven),
-                                          maintainOffset=maintainOffset,
-                                          skipTranslate=skipAttributes['t'],
-                                          skipRotate=skipAttributes['r'])[0]
-
-        constraintObject = cls(node)
-
-        # apply attributeValues
-        if attributeValues:
-            constraintObject.setAttributeValues(attributeValues)
-
-        # set weights
-        if weights:
-            constraintObject.setWeights(weights)
-
-        # return
-        return constraintObject
-
-    # PRIVATE COMMANDS #
-
-    def _driverInputs(self):
-        """get inputs
-
-        :return: the inputs of the constraint related to the drivers
+        :return: the input attributes connected to the driver transforms
         :rtype: list[str]
         """
 
         # return
         return ['target[*].targetParentMatrix']
 
-    def _drivenOutputs(self):
-        """get the outputs of the constraint
+    @property
+    def outputs(self):
+        """the output attributes of the constraint that are connected to the driven of the constraint
+        Those attributes ares scanned to get the driven nodes through connection
 
-        :return: the outputs of the constraint related to the driven
+        :return: the output attributes connected to the driven transform
         :rtype: list[str]
         """
 
@@ -651,33 +547,6 @@ class ParentConstraint(Constraint):
         return ['constraintTranslate', 'constraintTranslateX', 'constraintTranslateY', 'constraintTranslateZ',
                 'constraintRotate', 'constraintRotateX', 'constraintRotateY', 'constraintRotateZ']
 
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
-
-        :return: the available attributes
-        :rtype: list[str]
-        """
-
-        # init
-        availableAttributes = super(ParentConstraint, self)._availableAttributes()
-
-        # update settingAttributes
-        availableAttributes.extend(['interpType',
-                                    'restRotateX', 'restRotateY', 'restRotateZ',
-                                    'restTranslateX', 'restTranslateY', 'restTranslateZ'])
-
-        # return
-        return availableAttributes
-
-
-class PointConstraint(Constraint):
-    """node object that manipulates an ``point`` constraint node
-    """
-
-    # ATTRIBUTES #
-
-    _nodeType = 'pointConstraint'
-
     # COMMANDS #
 
     @classmethod
@@ -686,36 +555,39 @@ class PointConstraint(Constraint):
                driven,
                drivenAttributes=None,
                maintainOffset=False,
-               weights=None,
                attributeValues=None,
                name=None,
                **__):
-        """create a pointConstraint
+        """create a parentConstraint
 
         :param drivers: transforms driving the constraint
-        :type drivers: list[:class:`cgp_maya_utils.scene.Transform`]
+        :type drivers: list[str or :class:`cgp_maya_utils.scene.Transform` or :class:`cgp_maya_utils.scene.Joint`]
 
         :param driven: transform driven by the constraint
-        :type driven: str or :class:`cgp_maya_utils.scene.Transform`
+        :type driven: str or :class:`cgp_maya_utils.scene.Transform` or :class:`cgp_maya_utils.scene.Joint`
 
         :param drivenAttributes: driven attributes controlled by the constraint - all attributes if nothing is specified
         :type drivenAttributes: list[:class:`cgp_maya_utils.constants.Transform`]
 
-        :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
+        :param maintainOffset: ``True`` : constraint is created with offset -
+                               ``False`` : constraint is created without offset
         :type maintainOffset: bool
 
-        :param weights: values of the weight attributes of the constraint
-        :type weights: list[int, float]
-
-        :param attributeValues: attribute values to set on the constraint
+        :param attributeValues: attribute values to set on the created constraint
         :type attributeValues: dict
 
-        :param name: name of the constraint
+        :param name: name of the created constraint
         :type name: str
 
         :return: the created constraint
-        :rtype: :class:`cgp_maya_utils.scene.PointConstraint`
+        :rtype: :class:`cgp_maya_utils.scene.ParentConstraint`
         """
+
+        # errors
+        if not drivers or not driven:
+            maya.cmds.warning('no drivers and/or driven specified - drivers : {0} - driven : {1}'
+                              .format(drivers, driven))
+            return
 
         # init
         drivers = [str(driver) for driver in drivers]
@@ -726,84 +598,71 @@ class PointConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('no valid driven attributes specified')
+            raise RuntimeError('{0} can\'t be parentConstraint'.format(driven))
+
+        # get name
+        name = name or 'parentConstraint'
 
         # get skip attributes
-        skipAttributes = []
+        skip = {'t': [], 'r': []}
 
-        for axe in ['x', 'y', 'z']:
-            if 't{0}'.format(axe) not in drivenAttributes:
-                skipAttributes.append(axe)
+        for key in skip:
+            for axe in ['x', 'y', 'z']:
+                if '{0}{1}'.format(key, axe) not in drivenAttributes:
+                    skip[key].append(axe)
 
         # execute
-        node = maya.cmds.pointConstraint(drivers,
-                                         driven,
-                                         name=name or '{0}_parentConstraint'.format(driven),
-                                         maintainOffset=maintainOffset,
-                                         skip=skipAttributes)[0]
+        node = maya.cmds.parentConstraint(drivers,
+                                          driven,
+                                          name=name,
+                                          maintainOffset=maintainOffset,
+                                          skipTranslate=skip['t'],
+                                          skipRotate=skip['r'])[0]
 
-        constraintObject = cls(node)
+        cstrObject = cls(node)
 
         # apply attributeValues
         if attributeValues:
-            constraintObject.setAttributeValues(attributeValues)
-
-        # set weights
-        if weights:
-            constraintObject.setWeights(weights)
+            cstrObject.setAttributeValues(attributeValues)
 
         # return
-        return constraintObject
+        return cstrObject
 
-    # PRIVATE COMMANDS #
 
-    def _driverInputs(self):
-        """get inputs
+class PointConstraint(Constraint):
+    """node object that manipulates a ``point`` constraint node
+    """
 
-        :return: the inputs of the constraint related to the drivers
+    # ATTRIBUTES #
+
+    _SUB_TYPE = cgp_generic_utils.constants.RigSubType.POINT
+    _TYPE = cgp_maya_utils.constants.NodeType.POINT_CONSTRAINT
+
+    # PROPERTIES #
+
+    @property
+    def inputs(self):
+        """get the input attributes of the constraint that are connected to the drivers of the constraint
+        Those attributes ares scanned to get the driver nodes through connection
+
+        :return: the input attributes connected to the driver transforms
         :rtype: list[str]
         """
 
         # return
         return ['target[*].targetTranslate']
 
-    def _drivenOutputs(self):
-        """get the outputs of the constraint
+    @property
+    def outputs(self):
+        """get the output attributes of the constraint that are connected to the driven of the constraint
+        Those attributes ares scanned to get the driven nodes through connection
 
-        :return: the outputs of the constraint related to the driven
+        :return: the output attributes connected to the driven transform
         :rtype: list[str]
         """
 
         # return
         return ['constraintTranslate', 'constraintTranslateX', 'constraintTranslateY', 'constraintTranslateZ']
-
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
-
-        :return: the available attributes
-        :rtype: list[str]
-        """
-
-        # init
-        availableAttributes = super(PointConstraint, self)._availableAttributes()
-
-        # update settingAttributes
-        availableAttributes.extend(['constraintOffsetPolarity',
-                                    'restTranslateX',
-                                    'restTranslateY',
-                                    'restTranslateZ'])
-
-        # return
-        return availableAttributes
-
-
-class ScaleConstraint(Constraint):
-    """node object that manipulates an ``scale`` constraint node
-    """
-
-    # ATTRIBUTES #
-
-    _nodeType = 'scaleConstraint'
 
     # COMMANDS #
 
@@ -813,36 +672,39 @@ class ScaleConstraint(Constraint):
                driven,
                drivenAttributes=None,
                maintainOffset=False,
-               weights=None,
                attributeValues=None,
                name=None,
                **__):
-        """create a scaleConstraint
+        """create a pointConstraint
 
         :param drivers: transforms driving the constraint
-        :type drivers: list[str] or list[:class:`cgp_maya_utils.scene.Transform`]
+        :type drivers: list[str or :class:`cgp_maya_utils.scene.Transform` or :class:`cgp_maya_utils.scene.Joint`]
 
         :param driven: transform driven by the constraint
-        :type driven: str or :class:`cgp_maya_utils.scene.Transform`
+        :type driven: str or :class:`cgp_maya_utils.scene.Transform` or :class:`cgp_maya_utils.scene.Joint`
 
         :param drivenAttributes: driven attributes controlled by the constraint - all attributes if nothing is specified
         :type drivenAttributes: list[:class:`cgp_maya_utils.constants.Transform`]
 
-        :param maintainOffset: ``True`` : constraint created with offset - ``False`` : constraint created without offset
+        :param maintainOffset: ``True`` : constraint is created with offset -
+                               ``False`` : constraint is created without offset
         :type maintainOffset: bool
 
-        :param weights: values of the weight attributes of the constraint
-        :type weights: list[int, float]
-
-        :param attributeValues: attribute values to set on the constraint
+        :param attributeValues: attribute values to set on the created constraint
         :type attributeValues: dict
 
-        :param name: name of the constraint
+        :param name: name of the created constraint
         :type name: str
 
         :return: the created constraint
-        :rtype: :class:`cgp_maya_utils.scene.ScaleConstraint`
+        :rtype: :class:`cgp_maya_utils.scene.PointConstraint`
         """
+
+        # errors
+        if not drivers or not driven:
+            maya.cmds.warning('no drivers and/or driven specified - drivers : {0} - driven : {1}'
+                              .format(drivers, driven))
+            return
 
         # init
         drivers = [str(driver) for driver in drivers]
@@ -853,63 +715,144 @@ class ScaleConstraint(Constraint):
 
         # errors
         if not drivenAttributes:
-            raise RuntimeError('no valid driven attributes specified')
+            raise RuntimeError('{0} can\'t be pointConstraint'.format(driven))
+
+        # get name
+        name = name or 'pointConstraint'
 
         # get skip attributes
-        skipAttributes = []
+        skip = []
 
         for axe in ['x', 'y', 'z']:
-            if 's{0}'.format(axe) not in drivenAttributes:
-                skipAttributes.append(axe)
+            if 't{0}'.format(axe) not in drivenAttributes:
+                skip.append(axe)
 
         # execute
-        node = maya.cmds.scaleConstraint(drivers,
+        node = maya.cmds.pointConstraint(drivers,
                                          driven,
-                                         name=name or '{0}_scaleConstraint'.format(driven),
+                                         name=name,
                                          maintainOffset=maintainOffset,
-                                         skip=skipAttributes)[0]
+                                         skip=skip)[0]
 
-        constraintObject = cls(node)
+        cstrObject = cls(node)
 
         # apply attributeValues
         if attributeValues:
-            constraintObject.setAttributeValues(attributeValues)
-
-        # set weights
-        if weights:
-            constraintObject.setWeights(weights)
+            cstrObject.setAttributeValues(attributeValues)
 
         # return
-        return constraintObject
+        return cstrObject
 
-    # PRIVATE COMMANDS #
 
-    def _driverInputs(self):
-        """get inputs
+class ScaleConstraint(Constraint):
+    """node object that manipulates a ``scale`` constraint node
+    """
 
-        :return: the inputs of the constraint related to the drivers
+    # ATTRIBUTES #
+
+    _SUB_TYPE = cgp_generic_utils.constants.RigSubType.SCALE
+    _TYPE = cgp_maya_utils.constants.NodeType.SCALE_CONSTRAINT
+
+    # PROPERTIES #
+
+    @property
+    def inputs(self):
+        """get the input attributes of the constraint that are connected to the drivers of the constraint
+        Those attributes ares scanned to get the driver nodes through connection
+
+        :return: the input attributes connected to the driver transforms
         :rtype: list[str]
         """
 
         # return
         return ['target[*].targetScale']
 
-    def _drivenOutputs(self):
-        """get the outputs of the constraint
+    @property
+    def outputs(self):
+        """get the output attributes of the constraint that are connected to the driven of the constraint
+        Those attributes ares scanned to get the driven nodes through connection
 
-        :return: the outputs of the constraint related to the driven
+        :return: the output attributes connected to the driven transform
         :rtype: list[str]
         """
 
         # return
         return ['constraintScale', 'constraintScaleX', 'constraintScaleY', 'constraintScaleZ']
 
-    def _availableAttributes(self):
-        """the attributes that are listed by the ``Node.attributes`` function
+    # COMMANDS #
 
-        :return: the available attributes
-        :rtype: list[str]
+    @classmethod
+    def create(cls,
+               drivers,
+               driven,
+               drivenAttributes=None,
+               maintainOffset=False,
+               attributeValues=None,
+               name=None,
+               **__):
+        """create a scaleConstraint
+
+        :param drivers: transforms driving the constraint
+        :type drivers: list[str or :class:`cgp_maya_utils.scene.Transform` or :class:`cgp_maya_utils.scene.Joint`]
+
+        :param driven: transform driven by the constraint
+        :type driven: str or :class:`cgp_maya_utils.scene.Transform` or :class:`cgp_maya_utils.scene.Joint`
+
+        :param drivenAttributes: driven attributes controlled by the constraint - all attributes if nothing is specified
+        :type drivenAttributes: list[:class:`cgp_maya_utils.constants.Transform`]
+
+        :param maintainOffset: ``True`` : constraint is created with offset -
+                               ``False`` : constraint is created without offset
+        :type maintainOffset: bool
+        :param attributeValues: attribute values to set on the created constraint
+        :type attributeValues: dict
+
+        :param name: name of the created constraint
+        :type name: str
+
+        :return: the created constraint
+        :rtype: :class:`cgp_maya_utils.scene.ScaleConstraint`
         """
 
+        # errors
+        if not drivers or not driven:
+            maya.cmds.warning('no drivers and/or driven specified - drivers : {0} - driven : {1}'
+                              .format(drivers, driven))
+            return
+
+        # init
+        drivers = [str(driver) for driver in drivers]
+        driven = str(driven)
+
+        # get driven attributes
+        drivenAttributes = cls._formatDrivenAttributes(driven, drivenAttributes=drivenAttributes)
+
+        # errors
+        if not drivenAttributes:
+            raise RuntimeError('{0} can\'t be scaleConstraint'.format(driven))
+
+        # get name
+        name = name or 'scaleConstraint'
+
+        # get skip attributes
+        skip = []
+
+        for axe in ['x', 'y', 'z']:
+            if 's{0}'.format(axe) not in drivenAttributes:
+                skip.append(axe)
+
+        # execute
+        node = maya.cmds.scaleConstraint(drivers,
+                                         driven,
+                                         name=name,
+                                         maintainOffset=maintainOffset,
+                                         skip=skip)[0]
+
+        cstrObject = cls(node)
+
+        # apply attributeValues
+        if attributeValues:
+            cstrObject.setAttributeValues(attributeValues)
+
         # return
-        return ['enableRestPosition', 'lockOutput']
+        return cstrObject

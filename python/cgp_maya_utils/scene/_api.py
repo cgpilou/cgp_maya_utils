@@ -6,58 +6,226 @@ maya scene management functions
 import re
 
 # imports third-parties
+import maya.api.OpenMaya
 import maya.cmds
 
 # imports local
 import cgp_maya_utils.constants
+import cgp_maya_utils.api
 
 
 _ATTRIBUTE_TYPES = {}
 _COMPONENT_TYPES = {}
 _MISC_TYPES = {}
 _NODE_TYPES = {}
+_OPTIONVAR_TYPES = {}
+
+
+# ANIM KEY COMMANDS #
+
+
+def animKey(attr, frame, layer=None):
+    """get the animKey object from an attribute and a frame
+
+    :param attr: attribute associated to the animKey
+    :type attr: str or :class:`cgp_maya_utils.scene.Attribute`
+
+    :param frame: frame of the animKey
+    :type frame: float
+
+    :param layer: the animLayer containing the animKey
+    :type layer: str or :class:`cgp_maya_utils.scene.AnimLayer`
+
+    :return: the animKey object
+    :rtype: :class:`cgp_maya_utils.scene.AnimKey`
+    """
+
+    # cast params in expected types
+    attr = attribute(attr) if isinstance(attr, str) else attr
+    layer = animLayer(layer) if isinstance(layer, str) else layer
+
+    # return
+    return _MISC_TYPES[cgp_maya_utils.constants.MiscType.ANIM_KEY](attr, frame, layer)
+
+
+def getAnimKeys(attributes=None,
+                frames=None,
+                animLayers=None,
+                attributesIncluded=True,
+                framesIncluded=True,
+                animLayersIncluded=True):
+    """get the existing animKeys in the scene
+
+    :param attributes: attributes used to get the animKeys - All if nothing is specified
+    :type attributes: list[str, :class:`cgp_maya_utils.scene.Attribute`]
+
+    :param frames: frames used to get the animKeys - All if nothing is specified
+    :type frames: list[float]
+
+    :param animLayers: animLayers used to get the animKeys - All if nothing is specified
+    :type animLayers: list[str or :class:`cgp_maya_utils.scene.AnimLayer`]
+
+    :param attributesIncluded: ``True`` : the attributes will be included - ``False`` : the attributes will be excluded
+    :type attributesIncluded: bool
+
+    :param framesIncluded: ``True`` : the frames will be included - ``False`` : the frames will be excluded
+    :type framesIncluded: bool
+
+    :param animLayersIncluded: ``True`` : the animLayers will be included - ``False`` :  the animLayers will be excluded
+    :type animLayersIncluded: bool
+
+    :return: the animKeys
+    :rtype: list[:class:`cgp_maya_utils.scene.AnimKey`]
+    """
+
+    # cast param in expected types
+    attributes = ([attribute(attr) if isinstance(attr, str) else attr for attr in attributes]
+                  if attributes else [])
+
+    # getting keys from Attribute is faster than from AnimLayer so we prioritise this way
+    if attributes and attributesIncluded:
+        keys = [key
+                for attr in attributes
+                for key in attr.animKeys(animLayers=animLayers, animLayersIncluded=animLayersIncluded)]
+
+    # get keys from the animation layers
+    else:
+
+        # cast param in expected types
+        animLayers = ([animLayer(layer) if isinstance(layer, str) else layer for layer in animLayers]
+                      if animLayers else getAnimLayers())
+
+        # return keys
+        keys = [key
+                for layer in animLayers
+                for key in layer.animKeys(attributes=attributes or None, attributesIncluded=attributesIncluded)]
+
+    # return all keys
+    if not frames:
+        return keys
+
+    # return keys inside the given frames
+    if framesIncluded:
+        return [key for key in keys if key.frame() in frames]
+
+    # return keys outside the given frames
+    return [key for key in keys if key.frame() not in frames]
+
+
+# ANIM LAYER COMMANDS #
+
+
+def animLayer(layer):
+    """get the animLayer object from a layer's name
+
+    :param layer: the name of the animLayer
+    :type layer: None or str or :class:`cgp_maya_utils.scene.AnimLayer`
+
+    :return: the animLayer object
+    :rtype: :class:`cgp_maya_utils.scene.AnimLayer`
+    """
+
+    # cast params in expected types
+    layerNode = None if layer is None else node(layer) if isinstance(layer, str) else layer.node()
+
+    # return
+    return _MISC_TYPES[cgp_maya_utils.constants.MiscType.ANIM_LAYER](layerNode)
+
+
+def getAnimLayers(noneLayerIncluded=True, baseLayerIncluded=True, onlyActive=False, onlyInactive=False):
+    """get the existing animLayers in the scene
+
+    :param noneLayerIncluded: ``True`` : the None layer is included - ``False`` : the None layer is excluded
+    :type noneLayerIncluded: bool
+
+    :param baseLayerIncluded: ``True`` : the Base layer is included - ``False`` : the Base layer is excluded
+    :type noneLayerIncluded: bool
+
+    :param onlyActive: ``True`` : only active layers are returned - ``False`` : not only active layers are returned
+    :type onlyActive: bool
+
+    :param onlyInactive: ``True`` : only inactive layers are returned - ``False`` : not only inactive layers are returned
+    :type onlyInactive: bool
+
+    :return: the existing animLayers
+    :rtype: list[:class:`cgp_maya_utils.scene.AnimLayer`]
+    """
+
+    # init
+    genericType = cgp_maya_utils.constants.MiscType.ANIM_LAYER
+
+    # check params
+    if onlyActive and onlyInactive:
+        raise ValueError('unable to get only active and only inactive layers at the same time')
+
+    # get layers
+    activeLayers = _MISC_TYPES[genericType]._getAnimLayerNodeNames(onlyActive=True)
+    baseLayer = maya.cmds.animLayer(query=True, root=True)
+    allLayers = activeLayers if onlyActive else _MISC_TYPES[genericType]._getAnimLayerNodeNames()
+
+    # remove base layer if asked to
+    if not baseLayerIncluded and baseLayer:
+        allLayers = [layer for layer in allLayers if layer != baseLayer]
+
+    # remove inactive layers if asked to
+    if onlyInactive:
+        allLayers = [layer for layer in allLayers if layer not in activeLayers]
+
+    # add the None layer if asked to
+    if noneLayerIncluded:
+
+        # check if none layer is active
+        noneIsActive = not activeLayers
+
+        # update allLayers
+        if ((not onlyActive and not onlyInactive)
+                or (onlyActive and noneIsActive)
+                or (onlyInactive and not noneIsActive)):
+            allLayers.insert(0, None)
+
+    # return
+    return [animLayer(name) for name in allLayers]
 
 
 # ATTRIBUTE COMMANDS #
 
 
-def attribute(fullName):
-    """the attribute object from an attribute full name
+def attribute(attribute_):
+    """get the attribute object from an attribute full name
 
-    :param fullName: the full name of the attribute - ``node.attribute``
-    :type fullName: str
+    :param attribute_: the MPlug of the attribute or its full name - ``node.attribute``
+    :type attribute_: str or :class:`maya.api.OpenMaya.MPlug`
 
     :return: the attribute object
-    :rtype: :class:`cgp_maya_utils.scene.Attribute`,
-            :class:`cgp_maya_utils.scene.BoolAttribute`,
-            :class:`cgp_maya_utils.scene.ByteAttribute`,
-            :class:`cgp_maya_utils.scene.CompoundAttribute`,
-            :class:`cgp_maya_utils.scene.Double3Attribute`,
-            :class:`cgp_maya_utils.scene.DoubleAngleAttribute`,
-            :class:`cgp_maya_utils.scene.DoubleAttribute`,
-            :class:`cgp_maya_utils.scene.DoubleLinearAttribute`,
-            :class:`cgp_maya_utils.scene.EnumAttribute`,
-            :class:`cgp_maya_utils.scene.Float3Attribute`,
-            :class:`cgp_maya_utils.scene.FloatAttribute`,
-            :class:`cgp_maya_utils.scene.LongAttribute`,
-            :class:`cgp_maya_utils.scene.MatrixAttribute`,
-            :class:`cgp_maya_utils.scene.MessageAttribute`,
-            :class:`cgp_maya_utils.scene.NumericAttribute`,
-            :class:`cgp_maya_utils.scene.ShortAttribute`,
-            :class:`cgp_maya_utils.scene.StringAttribute`,
-            :class:`cgp_maya_utils.scene.TDataCompoundAttribute`,
-            :class:`cgp_maya_utils.scene.TimeAttribute`
+    :rtype: Attribute
     """
 
-    # get infos
-    attributeType = maya.cmds.getAttr(fullName, type=True)
+    # init
+    genericClass = _ATTRIBUTE_TYPES[cgp_maya_utils.constants.AttributeType.ATTRIBUTE]
 
-    # return
-    return _ATTRIBUTE_TYPES.get(attributeType, _ATTRIBUTE_TYPES['attribute'])(fullName)
+    # get plug
+    attributePlug = (attribute_
+                     if isinstance(attribute_, maya.api.OpenMaya.MPlug)
+                     else genericClass._plugFromFullName(attribute_))
+
+    # get type
+    attributeType = genericClass._typeFromPlug(attributePlug)
+
+    # return the class associated to the exact type
+    attributeClass = _ATTRIBUTE_TYPES.get(attributeType)
+    if attributeClass:
+        return attributeClass(attributePlug)
+
+    # fallback on generic compound attribute
+    if attributeType in cgp_maya_utils.constants.AttributeType.COMPOUNDS:
+        return _ATTRIBUTE_TYPES[cgp_maya_utils.constants.AttributeType.COMPOUND](attributePlug)
+
+    # fallback on generic attribute
+    return genericClass(attributePlug)
 
 
 def connection(source, destination):
-    """the connection object representing a connection, live or virtual, between the source and the destination
+    """get the connection object representing a connection, live or virtual, between the source and the destination
 
     :param source: the source of the connection
     :type source: str or :class:`cgp_maya_utils.scene.Attribute`
@@ -70,7 +238,83 @@ def connection(source, destination):
     """
 
     # return
-    return _ATTRIBUTE_TYPES['connection'](source, destination)
+    return _MISC_TYPES[cgp_maya_utils.constants.MiscType.CONNECTION](source, destination)
+
+
+def getConnections(node_,
+                   attributes=None,
+                   sources=True,
+                   destinations=True,
+                   nodeTypes=None,
+                   nodeTypesIncluded=True,
+                   skipConversionNodes=False):
+    """get the connections from the specified node
+
+    :param node_: node to get the connections from
+    :type node_: str
+
+    :param attributes: list of attributes to get the connections from - get all if nothing specified
+    :type attributes: list[str]
+
+    :param sources: ``True`` : get the source connections - ``False`` : does not get source connections
+    :type sources: bool
+
+    :param destinations: ``True`` : get the destination connections - ``False`` : does not get destination connections
+    :type destinations: bool
+
+    :param nodeTypes: types of nodes used to get the connections - All if nothing is specified
+    :type nodeTypes: list[str]
+
+    :param nodeTypesIncluded: ``True`` : include specified node types - ``False`` : exclude specified node types
+    :type nodeTypesIncluded: bool
+
+    :param skipConversionNodes: ``True`` : conversion nodes are skipped - ``False`` : conversion nodes are not skipped
+    :type skipConversionNodes: bool
+
+    :return: the connections
+    :rtype: list[:class:`cgp_maya_utils.scene.Connection`]
+    """
+
+    # init
+    toQueries = ['{0}.{1}'.format(node_, attr) for attr in attributes] if attributes else [node_]
+    nodeTypes = nodeTypes or []
+    data = []
+
+    # get source connections
+    sourceConnections = maya.cmds.listConnections(toQueries,
+                                                  source=True,
+                                                  destination=False,
+                                                  plugs=True,
+                                                  skipConversionNodes=skipConversionNodes,
+                                                  connections=True) or [] if sources else []
+
+    # get destination connections
+    destinationConnections = maya.cmds.listConnections(toQueries,
+                                                       source=False,
+                                                       destination=True,
+                                                       plugs=True,
+                                                       skipConversionNodes=skipConversionNodes,
+                                                       connections=True) or [] if destinations else []
+
+    # sort connections
+    sourceConnections = reversed(zip(*[iter(reversed(sourceConnections))] * 2))
+    destinationConnections = reversed(zip(*[iter(destinationConnections)] * 2))
+
+    # execute
+    for index, connections in enumerate([sourceConnections, destinationConnections]):
+        for connection_ in connections:
+
+            # check if not is a connectedType
+            isValid = bool(set(maya.cmds.nodeType(connection_[index], inherited=True)) & set(nodeTypes))
+
+            # update
+            if (not nodeTypes and nodeTypesIncluded
+                    or nodeTypes and nodeTypesIncluded and isValid
+                    or nodeTypes and not nodeTypesIncluded and not isValid):
+                data.append(connection(*connection_))
+
+    # return
+    return data
 
 
 def createAttribute(data, **extraData):
@@ -79,29 +323,11 @@ def createAttribute(data, **extraData):
     :param data: data used to create the attribute
     :type data: dict
 
-    :param extraData: extraData used to update the data dictionary before creating the attribute
+    :param extraData: extraData used to update the data before creating the attribute
     :type extraData: any
 
     :return: the created attribute
-    :rtype: :class:`cgp_maya_utils.scene.Attribute`,
-            :class:`cgp_maya_utils.scene.BoolAttribute`,
-            :class:`cgp_maya_utils.scene.ByteAttribute`,
-            :class:`cgp_maya_utils.scene.CompoundAttribute`,
-            :class:`cgp_maya_utils.scene.Double3Attribute`,
-            :class:`cgp_maya_utils.scene.DoubleAngleAttribute`,
-            :class:`cgp_maya_utils.scene.DoubleAttribute`,
-            :class:`cgp_maya_utils.scene.DoubleLinearAttribute`,
-            :class:`cgp_maya_utils.scene.EnumAttribute`,
-            :class:`cgp_maya_utils.scene.Float3Attribute`,
-            :class:`cgp_maya_utils.scene.FloatAttribute`,
-            :class:`cgp_maya_utils.scene.LongAttribute`,
-            :class:`cgp_maya_utils.scene.MatrixAttribute`,
-            :class:`cgp_maya_utils.scene.MessageAttribute`,
-            :class:`cgp_maya_utils.scene.NumericAttribute`,
-            :class:`cgp_maya_utils.scene.ShortAttribute`,
-            :class:`cgp_maya_utils.scene.StringAttribute`,
-            :class:`cgp_maya_utils.scene.TDataCompoundAttribute`,
-            :class:`cgp_maya_utils.scene.TimeAttribute`
+    :rtype: Attribute
     """
 
     # update data
@@ -119,34 +345,16 @@ def createAttribute(data, **extraData):
 
 
 def getAttributes(name, attributeTypes=None):
-    """get the existing attributes in the scene
+    """get existing attributes in the scene
 
     :param name: name of the attributes to get in the scene
     :type name: str
 
     :param attributeTypes: types of attributes to get in the scene
-    :type attributeTypes: list[str]
+    :type attributeTypes: list[:class:`cgp_maya_utils.constants.AttributeType`]
 
     :return: the listed Attributes
-    :rtype: tuple[:class:`cgp_maya_utils.scene.Attribute`,
-                  :class:`cgp_maya_utils.scene.BoolAttribute`,
-                  :class:`cgp_maya_utils.scene.ByteAttribute`,
-                  :class:`cgp_maya_utils.scene.CompoundAttribute`,
-                  :class:`cgp_maya_utils.scene.Double3Attribute`,
-                  :class:`cgp_maya_utils.scene.DoubleAngleAttribute`,
-                  :class:`cgp_maya_utils.scene.DoubleAttribute`,
-                  :class:`cgp_maya_utils.scene.DoubleLinearAttribute`,
-                  :class:`cgp_maya_utils.scene.EnumAttribute`,
-                  :class:`cgp_maya_utils.scene.Float3Attribute`,
-                  :class:`cgp_maya_utils.scene.FloatAttribute`,
-                  :class:`cgp_maya_utils.scene.LongAttribute`,
-                  :class:`cgp_maya_utils.scene.MatrixAttribute`,
-                  :class:`cgp_maya_utils.scene.MessageAttribute`,
-                  :class:`cgp_maya_utils.scene.NumericAttribute`,
-                  :class:`cgp_maya_utils.scene.ShortAttribute`,
-                  :class:`cgp_maya_utils.scene.StringAttribute`,
-                  :class:`cgp_maya_utils.scene.TDataCompoundAttribute`,
-                  :class:`cgp_maya_utils.scene.TimeAttribute`]
+    :rtype: list[Attribute]
     """
 
     # init
@@ -167,89 +375,56 @@ def getAttributes(name, attributeTypes=None):
             attributes.extend(listedAttributes)
 
     # return
-    return tuple([attribute(attribute_) for attribute_ in attributes])
+    return [attribute(item) for item in attributes]
 
 
 def getNodesFromAttributes(attributes):
-    """get the nodes having the specified attributes
+    """get the nodes which have the specified attributes
 
     :param attributes: attributes required on the node for it to be part of the return
     :type attributes: list[str]
 
-    :return: the gathered nodes
-    :rtype: tuple[:class:`cgp_maya_utils.scene.Node`,
-                  :class:`cgp_maya_utils.scene.AimConstraint`,
-                  :class:`cgp_maya_utils.scene.AnimCurve`,
-                  :class:`cgp_maya_utils.scene.AnimCurveTA`,
-                  :class:`cgp_maya_utils.scene.AnimCurveTL`,
-                  :class:`cgp_maya_utils.scene.AnimCurveTU`,
-                  :class:`cgp_maya_utils.scene.Constraint`,
-                  :class:`cgp_maya_utils.scene.DagNode`,
-                  :class:`cgp_maya_utils.scene.GeometryFilter`,
-                  :class:`cgp_maya_utils.scene.IkEffector`,
-                  :class:`cgp_maya_utils.scene.IkHandle`,
-                  :class:`cgp_maya_utils.scene.Joint`,
-                  :class:`cgp_maya_utils.scene.Mesh`,
-                  :class:`cgp_maya_utils.scene.Node`,
-                  :class:`cgp_maya_utils.scene.NurbsCurve`,
-                  :class:`cgp_maya_utils.scene.NurbsSurface`,
-                  :class:`cgp_maya_utils.scene.OrientConstraint`,
-                  :class:`cgp_maya_utils.scene.ParentConstraint`,
-                  :class:`cgp_maya_utils.scene.PointConstraint`,
-                  :class:`cgp_maya_utils.scene.Reference`,
-                  :class:`cgp_maya_utils.scene.ScaleConstraint`,
-                  :class:`cgp_maya_utils.scene.Shape`,
-                  :class:`cgp_maya_utils.scene.SkinCluster`,
-                  :class:`cgp_maya_utils.scene.Transform`]
+    :return: the nodes having the attributes
+    :rtype: list[Node]
     """
 
     # init
     data = []
     toQuery = []
-    attributes = set(attributes)
+    attributes = sorted(set(attributes))
 
     # init
-    for attr in sorted(attributes):
+    for attr in attributes:
         toQuery.extend(maya.cmds.ls('*.{0}'.format(attr), recursive=True, objectsOnly=True) or [])
+        toQuery = list(set(toQuery))
 
-    # execute
-    for node_ in set(toQuery):
+    for nod in toQuery:
 
         # get all the existing tags on the node
-        attrs = maya.cmds.listAttr(node_)
+        attrs = maya.cmds.listAttr(nod)
 
         # get specified attributes on the node
-        specifiedAttributes = sorted(attributes.intersection(set(attrs)))
+        specifiedAttributes = sorted(set(attributes).intersection(set(attrs)))
 
         # update data
         if attributes == specifiedAttributes:
-            data.append(node(node_))
+            data.append(nod)
 
     # return
-    return tuple(data)
+    return data
 
 
 # COMPONENT COMMANDS #
 
 
 def component(fullName):
-    """the component object from a component full name
+    """get the component object from a component full name
 
     :param fullName: the full name of the component - ``shape.component[]`` or ``shape.component[][]``
     :type fullName: str
 
     :return: the component object
-    :rtype: :class:`cgp_maya_utils.scene.Component`,
-            :class:`cgp_maya_utils.scene.CurvePoint`,
-            :class:`cgp_maya_utils.scene.Edge`,
-            :class:`cgp_maya_utils.scene.EditPoint`,
-            :class:`cgp_maya_utils.scene.Face`,
-            :class:`cgp_maya_utils.scene.IsoparmU`,
-            :class:`cgp_maya_utils.scene.IsoparmV`,
-            :class:`cgp_maya_utils.scene.SurfacePatch`,
-            :class:`cgp_maya_utils.scene.SurfacePoint`,
-            :class:`cgp_maya_utils.scene.TransformComponent`,
-            :class:`cgp_maya_utils.scene.Vertex`,
+    :rtype: Component
     """
 
     # errors
@@ -258,26 +433,28 @@ def component(fullName):
         raise ValueError('{0} is not a valid component'.format(fullName))
 
     # init
-    shape, comp = fullName.split('.')
+    genericType = cgp_maya_utils.constants.ComponentType.COMPONENT
+    shape, component_ = fullName.split('.')
 
     # errors
     if maya.cmds.nodeType(shape) not in cgp_maya_utils.constants.NodeType.SHAPES:
-        raise ValueError('{0} is not a shape node'.format(shape))
+        raise ValueError('{0} is not a shape component'.format(fullName))
 
-    # get infos
-    componentType = ''.join([char for char in comp if not char.isdigit()])
+    # get info
+    componentType = component_.split('[', 1)[0]
 
     # return
-    return _COMPONENT_TYPES.get(componentType, _COMPONENT_TYPES['component'])(fullName)
+    return _COMPONENT_TYPES.get(componentType, _COMPONENT_TYPES[genericType])(fullName)
 
 
 # MISC COMMANDS #
 
 
 def currentNamespace(asAbsolute=True):
-    """the current namespace of the maya scene
+    """get the current namespace of the maya scene
 
-    :param asAbsolute: defines whether or not the command will return an absolute namespace
+    :param asAbsolute: ``True`` : command returns an absolute namespace -
+                       ``False`` : command returns a relative namespace
     :type asAbsolute: bool
 
     :return: the current namespace object
@@ -289,9 +466,9 @@ def currentNamespace(asAbsolute=True):
 
 
 def namespace(name):
-    """the namespace object from a name
+    """get the namespace object from a namespace's name
 
-    :param name: name to get the namespace object from
+    :param name: name of the namespace to get the namespace object from
     :type name: str
 
     :return: the namespace object
@@ -299,32 +476,98 @@ def namespace(name):
     """
 
     # return
-    return _MISC_TYPES['namespace'](name)
+    return _MISC_TYPES[cgp_maya_utils.constants.MiscType.NAMESPACE](name)
 
 
-def plugin(name):
-    """the plugin object from a name
+def getNamespaces(parent=None, isRecursive=True):
+    """get the namespace objects available in scene
 
-    :param name: name to get the plugin object from
+    :param parent: name of the parent namespace for look under - default is root namespace `:`
+    :type parent: str or :class:`cgp_maya_utils.scene.Namespace`
+
+    :param isRecursive: ``True`` : get all namespaces recursively under the parent -
+                        ``False`` : get only direct children under the parent
+    :type isRecursive: bool
+
+    :return: the namespace objects
+    :rtype: list[:class:`cgp_maya_utils.scene.Namespace`]
+    """
+
+    # init
+    parent = parent or ':'
+
+    # return
+    return [namespace(name) for name in maya.cmds.namespaceInfo(parent, listOnlyNamespaces=True, recurse=isRecursive)]
+
+
+def optionVar(name):
+    """get the optionVar object of the given OptionVar name
+
+    :param name: the name of the optionVar to get the optionVar object from
     :type name: str
 
-    :return: the plugin object
-    :rtype: :class:`cgp_maya_utils.scene.Plugin`
+    :return: the optionVar object
+    :rtype: OptionVar
+    """
+
+    # init
+    genericType = cgp_maya_utils.constants.OptionVarType.GENERIC
+
+    # check existence
+    if not maya.cmds.optionVar(exists=name):
+        raise ValueError('No OptionVar named: {0!r}'.format(name))
+
+    # query value in order to find its type
+    value = maya.cmds.optionVar(query=name)
+
+    # get type name from value
+    if isinstance(value, list):
+        typeName = '{0}Array'.format(type(value[0]).__name__) if value else genericType  # avoid crash with unknown type
+    else:
+        typeName = type(value).__name__
+
+    # return the correct OptionVar instance
+    if typeName in _OPTIONVAR_TYPES:
+        return _OPTIONVAR_TYPES[typeName](name)
+
+    # if no OptionVar class accept this kind of data, return a read-only instance
+    return _OPTIONVAR_TYPES[genericType](name)
+
+
+def getOptionVars():
+    """get all the OptionVars from the current scene
+
+    :return: all the optionVars
+    :rtype: list[OptionVar]
     """
 
     # return
-    return _MISC_TYPES['plugin'](name)
+    return [optionVar(name) for name in maya.cmds.optionVar(list=True)]
+
+
+def plugin(name):
+    """get the plugin object from a plugin's name
+
+    :param name: name of the plugin to get
+    :type name: str
+
+    :return: the plugin object
+    :rtype: Plugin
+    """
+
+    # return
+    return _MISC_TYPES[cgp_maya_utils.constants.MiscType.PLUGIN](name)
 
 
 def scene():
-    """the scene object from the live maya scene
+    """get the scene object from the live maya scene
 
     :return: the scene object
     :rtype: :class:`cgp_maya_utils.scene.Scene`
     """
 
     # return
-    return _MISC_TYPES['scene']()
+    return _MISC_TYPES[cgp_maya_utils.constants.MiscType.SCENE]()
 
 
 # NODE COMMANDS #
@@ -340,79 +583,37 @@ def createNode(data, **extraData):
     :type extraData: any
 
     :return: the created node
-    :rtype: :class:`cgp_maya_utils.scene.Node`,
-            :class:`cgp_maya_utils.scene.AimConstraint`,
-            :class:`cgp_maya_utils.scene.AnimCurve`,
-            :class:`cgp_maya_utils.scene.AnimCurveTA`,
-            :class:`cgp_maya_utils.scene.AnimCurveTL`,
-            :class:`cgp_maya_utils.scene.AnimCurveTU`,
-            :class:`cgp_maya_utils.scene.Constraint`,
-            :class:`cgp_maya_utils.scene.DagNode`,
-            :class:`cgp_maya_utils.scene.GeometryFilter`,
-            :class:`cgp_maya_utils.scene.IkEffector`,
-            :class:`cgp_maya_utils.scene.IkHandle`,
-            :class:`cgp_maya_utils.scene.Joint`,
-            :class:`cgp_maya_utils.scene.Mesh`,
-            :class:`cgp_maya_utils.scene.Node`,
-            :class:`cgp_maya_utils.scene.NurbsCurve`,
-            :class:`cgp_maya_utils.scene.NurbsSurface`,
-            :class:`cgp_maya_utils.scene.OrientConstraint`,
-            :class:`cgp_maya_utils.scene.ParentConstraint`,
-            :class:`cgp_maya_utils.scene.PointConstraint`,
-            :class:`cgp_maya_utils.scene.Reference`,
-            :class:`cgp_maya_utils.scene.ScaleConstraint`,
-            :class:`cgp_maya_utils.scene.Shape`,
-            :class:`cgp_maya_utils.scene.SkinCluster`,
-            :class:`cgp_maya_utils.scene.Transform`
+    :rtype: Node
     """
 
     # update data
     data.update(extraData)
 
     # init attribute object
-    nodeObject = _NODE_TYPES.get(data['nodeType'], _NODE_TYPES['node'])
+    nodeObject = _NODE_TYPES.get(data['nodeType'], None)
+
+    # errors
+    if not nodeObject:
+        raise ValueError('{0} is not implemented'.format(data['nodeType']))
 
     # return
     return nodeObject.create(**data)
 
 
 def getNodes(namePattern=None, nodeTypes=None, asExactNodeTypes=False):
-    """get the existing nodes in the scene
+    """get existing nodes in the scene
 
-    :param namePattern: name pattern of the nodes to get - ex : *_suffix
+    :param namePattern: name pattern of the nodes to get - ex : '*_suffix'
     :type namePattern: str
 
-    :param nodeTypes: types of nodes to get in the scene
+    :param nodeTypes: types of nodes to get
     :type nodeTypes: list[str]
 
     :param asExactNodeTypes: ``True`` : list only exact node types - ``False`` : all types inheriting node types
     :type asExactNodeTypes: bool
 
     :return: the listed Nodes
-    :rtype: tuple[:class:`cgp_maya_utils.scene.Node`,
-                  :class:`cgp_maya_utils.scene.AimConstraint`,
-                  :class:`cgp_maya_utils.scene.AnimCurve`,
-                  :class:`cgp_maya_utils.scene.AnimCurveTA`,
-                  :class:`cgp_maya_utils.scene.AnimCurveTL`,
-                  :class:`cgp_maya_utils.scene.AnimCurveTU`,
-                  :class:`cgp_maya_utils.scene.Constraint`,
-                  :class:`cgp_maya_utils.scene.DagNode`,
-                  :class:`cgp_maya_utils.scene.GeometryFilter`,
-                  :class:`cgp_maya_utils.scene.IkEffector`,
-                  :class:`cgp_maya_utils.scene.IkHandle`,
-                  :class:`cgp_maya_utils.scene.Joint`,
-                  :class:`cgp_maya_utils.scene.Mesh`,
-                  :class:`cgp_maya_utils.scene.Node`,
-                  :class:`cgp_maya_utils.scene.NurbsCurve`,
-                  :class:`cgp_maya_utils.scene.NurbsSurface`,
-                  :class:`cgp_maya_utils.scene.OrientConstraint`,
-                  :class:`cgp_maya_utils.scene.ParentConstraint`,
-                  :class:`cgp_maya_utils.scene.PointConstraint`,
-                  :class:`cgp_maya_utils.scene.Reference`,
-                  :class:`cgp_maya_utils.scene.ScaleConstraint`,
-                  :class:`cgp_maya_utils.scene.Shape`,
-                  :class:`cgp_maya_utils.scene.SkinCluster`,
-                  :class:`cgp_maya_utils.scene.Transform`]
+    :rtype: tuple[Node]
     """
 
     # init
@@ -440,56 +641,40 @@ def getNodes(namePattern=None, nodeTypes=None, asExactNodeTypes=False):
             nodes.extend(listedNodes)
 
     # return
-    return tuple([node(node_) for node_ in nodes])
+    return tuple([node(item) for item in nodes])
 
 
 def node(name):
-    """the node object from a node name
+    """get the node object from a node's name
 
-    :param name: the name of the node
+    :param name: name of the node to get the node object from
     :type name: str
 
     :return: the node object
-    :rtype: :class:`cgp_maya_utils.scene.Node`,
-            :class:`cgp_maya_utils.scene.AimConstraint`,
-            :class:`cgp_maya_utils.scene.AnimCurve`,
-            :class:`cgp_maya_utils.scene.AnimCurveTA`,
-            :class:`cgp_maya_utils.scene.AnimCurveTL`,
-            :class:`cgp_maya_utils.scene.AnimCurveTU`,
-            :class:`cgp_maya_utils.scene.Constraint`,
-            :class:`cgp_maya_utils.scene.DagNode`,
-            :class:`cgp_maya_utils.scene.GeometryFilter`,
-            :class:`cgp_maya_utils.scene.IkEffector`,
-            :class:`cgp_maya_utils.scene.IkHandle`,
-            :class:`cgp_maya_utils.scene.Joint`,
-            :class:`cgp_maya_utils.scene.Mesh`,
-            :class:`cgp_maya_utils.scene.Node`,
-            :class:`cgp_maya_utils.scene.NurbsCurve`,
-            :class:`cgp_maya_utils.scene.NurbsSurface`,
-            :class:`cgp_maya_utils.scene.OrientConstraint`,
-            :class:`cgp_maya_utils.scene.ParentConstraint`,
-            :class:`cgp_maya_utils.scene.PointConstraint`,
-            :class:`cgp_maya_utils.scene.Reference`,
-            :class:`cgp_maya_utils.scene.ScaleConstraint`,
-            :class:`cgp_maya_utils.scene.Shape`,
-            :class:`cgp_maya_utils.scene.SkinCluster`,
-            :class:`cgp_maya_utils.scene.Transform`
+    :rtype: Node
     """
 
-    # get the current object
-    currentObject = _NODE_TYPES['node']
+    # query the node type via the open maya api (fastest but does not work with every node types)
+    nodeType = cgp_maya_utils.api.MayaObject(name).apiTypeStr
+    nodeType = nodeType[1].lower() + nodeType[2:]  # we remove the 'k' and we lower the first char
+    if nodeType not in cgp_maya_utils.constants.NodeType.API_ERRORED_TYPES and nodeType in _NODE_TYPES:
+        return _NODE_TYPES[nodeType](name)
 
-    # init node object
+    # query the exact type from maya.cmds (slower but works only with node types we already wrapped)
+    nodeType = maya.cmds.nodeType(name)
+    if nodeType in _NODE_TYPES:
+        return _NODE_TYPES[nodeType](name)
+
+    # return object based on inherited node type (slowest but fallback on inherited node types)
     for nodeType in reversed(maya.cmds.nodeType(name, inherited=True)):
         if nodeType in _NODE_TYPES:
-            currentObject = _NODE_TYPES[nodeType]
-            break
+            return _NODE_TYPES[nodeType](name)
 
-    # return
-    return currentObject(name)
+    # ultra generic fallback
+    return _NODE_TYPES[cgp_maya_utils.constants.NodeType.BASE_NODE](name)
 
 
-# PRIVATE COMMANDS #
+# MISC COMMANDS
 
 
 def _registerAttributeTypes(attributeTypes):
@@ -534,3 +719,14 @@ def _registerNodeTypes(nodeTypes):
 
     # execute
     _NODE_TYPES.update(nodeTypes)
+
+
+def _registerOptionVarTypes(optionVarTypes):
+    """register node types
+
+    :param optionVarTypes: optionVar types to register
+    :type optionVarTypes: dict
+    """
+
+    # execute
+    _OPTIONVAR_TYPES.update(optionVarTypes)

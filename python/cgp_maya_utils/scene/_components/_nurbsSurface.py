@@ -13,7 +13,7 @@ class IsoparmU(_generic.Component):
 
     # ATTRIBUTES #
 
-    _componentType = cgp_maya_utils.constants.ComponentType.ISOPARM_U
+    _TYPE = cgp_maya_utils.constants.ComponentType.ISOPARM_U
 
 
 class IsoparmV(_generic.Component):
@@ -22,7 +22,7 @@ class IsoparmV(_generic.Component):
 
     # ATTRIBUTES #
 
-    _componentType = cgp_maya_utils.constants.ComponentType.ISOPARM_V
+    _TYPE = cgp_maya_utils.constants.ComponentType.ISOPARM_V
 
 
 class SurfacePatch(_generic.Component):
@@ -31,7 +31,7 @@ class SurfacePatch(_generic.Component):
 
     # ATTRIBUTES #
 
-    _componentType = cgp_maya_utils.constants.ComponentType.SURFACE_PATCH
+    _TYPE = cgp_maya_utils.constants.ComponentType.SURFACE_PATCH
 
 
 class SurfacePoint(_generic.TransformComponent):
@@ -40,4 +40,4 @@ class SurfacePoint(_generic.TransformComponent):
 
     # ATTRIBUTES #
 
-    _componentType = cgp_maya_utils.constants.ComponentType.SURFACE_POINT
+    _TYPE = cgp_maya_utils.constants.ComponentType.SURFACE_POINT
